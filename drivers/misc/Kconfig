@@ -299,6 +299,13 @@ config PALM_QC_MODEM_HANDSHAKING_SUPPORT
 	  Enable this option if you want support for Qualcomm Modem Handshaking on Palm
 	  devices.
 
+config KERNEL_DEBUGGER_CORE
+	bool "Kernel Debugger Core"
+	default n
+	---help---
+	  Generic kernel debugging command processor used by low level
+	  (interrupt context) platform-specific debuggers.
+
 config OMAP_MISC_HSUART
 	tristate "OMAP High speed UART device driver"
 	depends on ARCH_OMAP2 || ARCH_OMAP3
