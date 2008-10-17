@@ -19,6 +19,7 @@
 #include <linux/input.h>
 #include <linux/major.h>
 #include <linux/device.h>
+#include <linux/wakelock.h>
 #include <linux/compat.h>
 
 #ifdef CONFIG_INPUT_EVDEV_TRACK_QUEUE
@@ -51,6 +52,7 @@ struct evdev_client {
 	struct evdev *evdev;
 	struct list_head node;
 	int monotonic_time;
+	struct wake_lock wake_lock;
 };
 
 static struct evdev *evdev_table[EVDEV_MINORS];
@@ -75,6 +77,7 @@ static void evdev_pass_event(struct evdev_client *client,
 	if( client->head == client->tail )
 		atomic_inc(&client->evdev->evq_ref);
 #endif
+	wake_lock_timeout(&client->wake_lock, 5 * HZ);
 	client->buffer[client->head++] = *event;
 	client->head &= EVDEV_BUFFER_SIZE - 1;
 
@@ -281,6 +284,7 @@ static int evdev_release(struct inode *inode, struct file *file)
 
 	evdev_fasync(-1, file, 0);
 	evdev_detach_client(evdev, client);
+	wake_lock_destroy(&client->wake_lock);
 	kfree(client);
 
 	evdev_close_device(evdev);
@@ -317,6 +321,7 @@ static int evdev_open(struct inode *inode, struct file *file)
 	}
 
 	spin_lock_init(&client->buffer_lock);
+	wake_lock_init(&client->wake_lock, WAKE_LOCK_SUSPEND, "evdev");
 	client->evdev = evdev;
 	evdev_attach_client(evdev, client);
 
@@ -488,6 +493,8 @@ static int evdev_fetch_next_event(struct evdev_client *client,
 		if( client->head == client->tail )
 			atomic_dec(&client->evdev->evq_ref);
 #endif
+		if (client->head == client->tail)
+			wake_unlock(&client->wake_lock);
 	}
 
 	spin_unlock_irq(&client->buffer_lock);
