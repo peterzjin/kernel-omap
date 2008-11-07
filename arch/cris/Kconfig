@@ -215,6 +215,8 @@ source "drivers/usb/Kconfig"
 
 source "kernel/Kconfig.instrumentation"
 
+source "drivers/staging/Kconfig"
+
 source "arch/cris/Kconfig.debug"
 
 source "security/Kconfig"

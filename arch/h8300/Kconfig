@@ -221,6 +221,8 @@ source "drivers/usb/Kconfig"
 
 endmenu
 
+source "drivers/staging/Kconfig"
+
 source "fs/Kconfig"
 
 source "kernel/Kconfig.instrumentation"
