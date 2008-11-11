@@ -14,7 +14,6 @@ config MMC_UNSAFE_RESUME
 	  This option is usually just for embedded systems which use
 	  a MMC/SD card for rootfs. Most people should say N here.
 
-
 config SDIO_FORCE_OPCOND_1_8V
   bool "Force SDIO card to report 1.8V operation condition."
   default n
@@ -26,3 +25,11 @@ config SDIO_WORKAROUND_MARVELL_CIS_B1_BUG
   default n
     help
 	   Select to enable workaround for Marvell CIS bug.
+
+config MMC_PARANOID_SD_INIT
+	bool "Enable paranoid SD card initialization (EXPERIMENTAL)"
+	help
+	  If you say Y here, the MMC layer will be extra paranoid
+	  about re-trying SD init requests. This can be a useful
+	  work-around for buggy controllers and hardware. Enable
+	  if you are experiencing issues with SD detection.
