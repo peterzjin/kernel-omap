@@ -23,3 +23,4 @@ obj-$(CONFIG_INPUT_TOUCHSCREEN)	+= touchscreen/
 obj-$(CONFIG_INPUT_MISC)	+= misc/
 obj-$(CONFIG_INPUT_ACCELEROMETER) += accelerometer/
 
+obj-$(CONFIG_INPUT_KEYRESET)	+= keyreset.o
