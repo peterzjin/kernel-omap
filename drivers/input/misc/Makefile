@@ -26,3 +26,4 @@ hsdl9100_proxsensor-$(CONFIG_ARCH_OMAP) += hsdl9100_prox_sense_omap.o
 
 obj-$(CONFIG_LIGHTSENSOR_AMBIENT6200)    += temt6200_lightsensor.o
 obj-$(CONFIG_INPUT_GPIO)		+= gpio_event.o gpio_matrix.o gpio_input.o gpio_output.o gpio_axis.o
+obj-$(CONFIG_INPUT_KEYCHORD)	+= keychord.o
