@@ -362,6 +362,9 @@ config MODEM_POWER_ON_NOTIFY
 	bool "Modem power-on notification"
 	help
 	  Say Y to enable the modem power-on notification
+config UID_STAT
+	bool "UID based statistics tracking exported to /proc/uid_stat"
+	default n
 
 endif # MISC_DEVICES
 

@@ -33,3 +33,4 @@ obj-$(CONFIG_HARDKEY_REBOOT)	+= hardkey_reboot.o
 obj-$(CONFIG_KERNEL_LOG)	+= klog.o
 obj-$(CONFIG_BATTERY_SIMPLE) += battery_simple.o
 obj-$(CONFIG_ANDROID_PMEM)	+= pmem.o
+obj-$(CONFIG_UID_STAT)		+= uid_stat.o
