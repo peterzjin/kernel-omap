@@ -35,3 +35,4 @@ obj-$(CONFIG_BATTERY_SIMPLE) += battery_simple.o
 obj-$(CONFIG_ANDROID_PMEM)	+= pmem.o
 obj-$(CONFIG_KERNEL_DEBUGGER_CORE)	+= kernel_debugger.o
 obj-$(CONFIG_UID_STAT)		+= uid_stat.o
+obj-$(CONFIG_WL127X_RFKILL)	+= wl127x-rfkill.o
