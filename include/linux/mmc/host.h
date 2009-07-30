@@ -136,9 +136,11 @@ struct mmc_host {
 	const struct mmc_bus_ops *bus_ops;	/* current bus driver */
 	unsigned int		bus_refs;	/* reference counter */
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	unsigned int		bus_resume_flags;
 #define MMC_BUSRESUME_MANUAL_RESUME	(1 << 0)
 #define MMC_BUSRESUME_NEEDS_RESUME	(1 << 1)
+#endif
 
 	unsigned int		sdio_irqs;
 	struct task_struct	*sdio_irq_thread;
@@ -183,6 +185,8 @@ static inline void *mmc_priv(struct mmc_host *host)
 #define mmc_dev(x)	((x)->parent)
 #define mmc_classdev(x)	(&(x)->class_dev)
 #define mmc_hostname(x)	((x)->class_dev.bus_id)
+
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 #define mmc_bus_needs_resume(host) ((host)->bus_resume_flags & MMC_BUSRESUME_NEEDS_RESUME)
 
 static inline void mmc_set_bus_resume_policy(struct mmc_host *host, int manual)
@@ -192,6 +196,7 @@ static inline void mmc_set_bus_resume_policy(struct mmc_host *host, int manual)
 	else
 		host->bus_resume_flags &= ~MMC_BUSRESUME_MANUAL_RESUME;
 }
+#endif
 
 extern int mmc_resume_bus(struct mmc_host *host);
 

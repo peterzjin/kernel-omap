@@ -555,6 +555,7 @@ static inline void mmc_bus_put(struct mmc_host *host)
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 int mmc_resume_bus(struct mmc_host *host)
 {
 	if (!mmc_bus_needs_resume(host))
@@ -578,6 +579,7 @@ int mmc_resume_bus(struct mmc_host *host)
 }
 
 EXPORT_SYMBOL(mmc_resume_bus);
+#endif
 
 /*
  * Assign a mmc bus handler to a host. Only one bus handler may control a
@@ -716,6 +718,12 @@ void mmc_rescan(struct work_struct *work)
 		if (host->bus_ops->detect && !host->bus_dead)
 			host->bus_ops->detect(host);
 
+		/* If the card was removed the bus will be marked
+		 * as dead - extend the wakelock so userspace
+		 * can respond */
+		if (host->bus_dead)
+			extend_wakelock = 1;
+
 		mmc_bus_put(host);
 	}
 
@@ -769,8 +777,10 @@ void mmc_stop_host(struct mmc_host *host)
  */
 int mmc_suspend_host(struct mmc_host *host, pm_message_t state)
 {
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	if (mmc_bus_needs_resume(host))
 		return 0;
+#endif
 
 	mmc_flush_scheduled_work();
 
@@ -803,11 +813,13 @@ EXPORT_SYMBOL(mmc_suspend_host);
 int mmc_resume_host(struct mmc_host *host)
 {
 	mmc_bus_get(host);
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	if (host->bus_resume_flags & MMC_BUSRESUME_MANUAL_RESUME) {
 		host->bus_resume_flags |= MMC_BUSRESUME_NEEDS_RESUME;
 		mmc_bus_put(host);
 		return 0;
 	}
+#endif
 
 	if (host->bus_ops && !host->bus_dead) {
 		mmc_power_up(host);
