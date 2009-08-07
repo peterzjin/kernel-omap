@@ -2527,25 +2527,11 @@ static int do_set_config(struct fsg_dev *fsg, u8 new_config)
 	if (fsg->config != 0) {
 		FSG_DBG(fsg, "reset config\n");
 		fsg->config = 0;
-		rc = do_set_interface(fsg, -1);
 	}
 
 	/* Enable the interface */
-	if (new_config != 0) {
+	if (new_config != 0)
 		fsg->config = new_config;
-		rc = do_set_interface(fsg, 0);
-		if (rc != 0)
-			fsg->config = 0;	/* Reset on errors */
-		else
-#if 0
-			/* new_config is always 1 (see fsg_function_set_all)
-			   so printing the value here is confusing - TK
-			 */
-			FSG_INFO(fsg, "config #%d\n", fsg->config);
-#else
-			FSG_INFO(fsg, "mass_storage ready\n");
-#endif
-	}
 
 #ifdef USE_SWITCH_DEVICE
 	switch_set_state(&fsg->sdev, new_config);
@@ -2710,6 +2696,7 @@ static void handle_exception(struct fsg_dev *fsg)
 
 	case FSG_STATE_EXIT:
 	case FSG_STATE_TERMINATED:
+		do_set_interface(fsg, -1);
 		do_set_config(fsg, 0);			// Free resources
 		spin_lock_irq(&fsg->lock);
 		fsg->state = FSG_STATE_TERMINATED;	// Stop the thread
@@ -3625,6 +3612,7 @@ static int fsg_function_set_alt_async(struct usb_function *f,
 	struct fsg_dev	*fsg = fsg_func_to_dev(f);
 	FSG_DBG(fsg, "fsg_function_set_alt_async intf: %d alt: %d\n", intf, alt);
 	fsg->new_config = 1;
+	do_set_interface(fsg, 0);
 	raise_exception(fsg, FSG_STATE_CONFIG_CHANGE);
 #ifdef CONFIG_USB_GADGET_EVENT
 	gadget_event_host_connected_async(1, 0);
@@ -3636,6 +3624,8 @@ static void fsg_function_disable(struct usb_function *f)
 {
 	struct fsg_dev	*fsg = fsg_func_to_dev(f);
 	FSG_DBG(fsg, "fsg_function_disable\n");
+	if (fsg->new_config)
+		do_set_interface(fsg, -1);
 	fsg->new_config = 0;
 	raise_exception(fsg, FSG_STATE_DISCONNECT);
 #ifdef CONFIG_USB_GADGET_EVENT
