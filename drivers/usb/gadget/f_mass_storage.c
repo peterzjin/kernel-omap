@@ -3421,6 +3421,10 @@ fsg_function_unbind(struct usb_configuration *c, struct usb_function *f)
 #ifdef CONFIG_USB_GADGET_EVENT
 	gadget_event_enable_storage_events(0);
 #endif
+
+#ifdef USE_SWITCH_DEVICE
+	switch_dev_unregister(&fsg->sdev);
+#endif
 }
 
 static int __init
