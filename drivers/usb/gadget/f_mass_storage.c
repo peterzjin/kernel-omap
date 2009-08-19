@@ -78,11 +78,17 @@
 #ifdef CONFIG_USB_FILE_STORAGE_MEDIASYNC
 #include <linux/vmalloc.h>
 #endif
+#ifdef CONFIG_USB_ANDROID
+#include <linux/platform_device.h>
+#endif
 
 #include <linux/usb_usual.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/composite.h>
 #include <linux/usb/gadget.h>
+#ifdef CONFIG_USB_ANDROID
+#include <linux/usb/android.h>
+#endif
 
 #ifdef CONFIG_USB_GADGET_EVENT
 #include <linux/usb/gadget_event.h>
@@ -3641,6 +3647,34 @@ static void fsg_function_resume(struct usb_function *f)
 {
 }
 
+#ifdef CONFIG_USB_ANDROID
+static int __init fsg_probe(struct platform_device *pdev)
+{
+	struct usb_mass_storage_platform_data *pdata = pdev->dev.platform_data;
+	struct fsg_dev *fsg = the_fsg;
+
+	printk(KERN_INFO "fsg_probe pdata: %p\n", pdata);
+
+	if (pdata) {
+		if (pdata->vendor)
+			fsg->vendor = pdata->vendor;
+
+		if (pdata->product)
+			fsg->product = pdata->product;
+
+		if (pdata->release)
+			fsg->release = pdata->release;
+	}
+
+	return 0;
+}
+
+static struct platform_driver fsg_platform_driver = {
+	.driver = { .name = "usb_mass_storage", },
+	.probe = fsg_probe,
+};
+#endif
+
 int __init mass_storage_function_add(struct usb_configuration *c, int nluns)
 {
 	int		rc;
@@ -3668,6 +3702,12 @@ int __init mass_storage_function_add(struct usb_configuration *c, int nluns)
 		goto err_switch_dev_register;
 #endif
 
+#ifdef CONFIG_USB_ANDROID
+	rc = platform_driver_register(&fsg_platform_driver);
+	if (rc != 0)
+		goto err_platform_driver_register;
+#endif
+
 #ifdef USE_WAKELOCK
 	wake_lock_init(&the_fsg->wake_lock, WAKE_LOCK_SUSPEND,
 		       "usb_mass_storage");
@@ -3687,9 +3727,14 @@ int __init mass_storage_function_add(struct usb_configuration *c, int nluns)
 	if (rc != 0)
 		goto err_usb_add_function;
 
+
 	return 0;
 
 err_usb_add_function:
+#ifdef CONFIG_USB_ANDROID
+	platform_driver_unregister(&fsg_platform_driver);
+err_platform_driver_register:
+#endif
 #ifdef USE_SWITCH_DEVICE
 	switch_dev_unregister(&the_fsg->sdev);
 err_switch_dev_register:
