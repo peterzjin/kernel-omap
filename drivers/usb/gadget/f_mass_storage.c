@@ -316,6 +316,11 @@ enum data_direction {
 struct fsg_dev {
 	struct usb_function function;
 
+#ifdef CONFIG_USB_ANDROID
+	/* optional "usb_mass_storage" platform device */
+	struct platform_device *pdev;
+#endif
+
 	/* lock protects: state and all the req_busy's */
 	spinlock_t		lock;
 
@@ -3462,7 +3467,15 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 		curlun = &fsg->luns[i];
 		curlun->ro = 0;
 		curlun->dev.release = lun_release;
+#ifdef CONFIG_USB_ANDROID
+		/* use "usb_mass_storage" platform device as parent if available */
+		if (fsg->pdev)
+			curlun->dev.parent = &fsg->pdev->dev;
+		else
+			curlun->dev.parent = &cdev->gadget->dev;
+#else
 		curlun->dev.parent = &cdev->gadget->dev;
+#endif
 		dev_set_drvdata(&curlun->dev, fsg);
 		snprintf(curlun->dev.bus_id, BUS_ID_SIZE,
 				"gadget-lun%d", i);
@@ -3653,6 +3666,7 @@ static int __init fsg_probe(struct platform_device *pdev)
 	struct usb_mass_storage_platform_data *pdata = pdev->dev.platform_data;
 	struct fsg_dev *fsg = the_fsg;
 
+	fsg->pdev = pdev;
 	printk(KERN_INFO "fsg_probe pdata: %p\n", pdata);
 
 	if (pdata) {
