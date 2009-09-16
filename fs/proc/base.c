@@ -217,7 +217,8 @@ struct mm_struct *mm_for_maps(struct task_struct *task)
 	task_lock(task);
 	if (task->mm != mm)
 		goto out;
-	if (task->mm != current->mm && __ptrace_may_attach(task) < 0)
+	if (task->mm != current->mm && __ptrace_may_attach(task) < 0 &&
+	    !capable(CAP_SYS_RESOURCE))
 		goto out;
 	task_unlock(task);
 	return mm;
