@@ -234,6 +234,7 @@ struct cgroup_subsys {
 	struct cgroup_subsys_state *(*create)(struct cgroup_subsys *ss,
 						  struct cgroup *cont);
 	void (*destroy)(struct cgroup_subsys *ss, struct cgroup *cont);
+	int (*allow_attach)(struct cgroup *cgrp, struct task_struct *tsk);
 	int (*can_attach)(struct cgroup_subsys *ss,
 			  struct cgroup *cont, struct task_struct *tsk);
 	void (*attach)(struct cgroup_subsys *ss, struct cgroup *cont,

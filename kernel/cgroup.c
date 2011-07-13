@@ -1224,6 +1224,24 @@ static int attach_task(struct cgroup *cgrp, struct task_struct *tsk)
 	return 0;
 }
 
+static int cgroup_allow_attach(struct cgroup *cgrp, struct task_struct *tsk)
+{
+	struct cgroup_subsys *ss;
+	int ret;
+
+	for_each_subsys(cgrp->root, ss) {
+		if (ss->allow_attach) {
+			ret = ss->allow_attach(cgrp, tsk);
+			if (ret)
+				return ret;
+		} else {
+			return -EACCES;
+		}
+	}
+
+	return 0;
+}
+
 /*
  * Attach task with pid 'pid' to cgroup 'cgrp'. Call with
  * cgroup_mutex, may take task_lock of task
@@ -1249,8 +1267,15 @@ static int attach_task_by_pid(struct cgroup *cgrp, char *pidbuf)
 
 		if ((current->euid) && (current->euid != tsk->uid)
 		    && (current->euid != tsk->suid)) {
-			put_task_struct(tsk);
-			return -EACCES;
+			/*
+			 * if the default permission check fails, give each
+			 * cgroup a chance to extend the permission check
+			 */
+			ret = cgroup_allow_attach(cgrp, tsk);
+			if (ret) {
+				put_task_struct(tsk);
+				return ret;
+			}
 		}
 	} else {
 		tsk = current;
