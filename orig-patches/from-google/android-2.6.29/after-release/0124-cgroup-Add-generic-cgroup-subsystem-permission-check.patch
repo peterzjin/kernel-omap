@@ -1,0 +1,134 @@
+From 2bda29ae9ba43a012a4ea9089dc3362b96f167a8 Mon Sep 17 00:00:00 2001
+From: San Mehat <san@google.com>
+Date: Thu, 21 May 2009 14:10:06 -0700
+Subject: [PATCH 124/247] cgroup: Add generic cgroup subsystem permission checks.
+
+    Rather than using explicit euid == 0 checks when trying to move
+tasks into a cgroup via CFS, move permission checks into each
+specific cgroup subsystem. If a subsystem does not specify a
+'can_attach' handler, then we fall back to doing our checks the old way.
+
+    This way non-root processes can add arbitrary processes to
+a cgroup if all the registered subsystems on that cgroup agree.
+
+    Also change explicit euid == 0 check to CAP_SYS_ADMIN
+
+Signed-off-by: San Mehat <san@google.com>
+---
+ kernel/cgroup.c         |   19 ++++++++++---------
+ kernel/cgroup_freezer.c |    8 ++++++++
+ kernel/cpuset.c         |    7 +++++++
+ kernel/sched.c          |    9 +++++++++
+ 4 files changed, 34 insertions(+), 9 deletions(-)
+
+diff --git a/kernel/cgroup.c b/kernel/cgroup.c
+index 9edb5c4..30d1e48 100644
+--- a/kernel/cgroup.c
++++ b/kernel/cgroup.c
+@@ -46,6 +46,7 @@
+ #include <linux/cgroupstats.h>
+ #include <linux/hash.h>
+ #include <linux/namei.h>
++#include <linux/capability.h>
+ 
+ #include <asm/atomic.h>
+ 
+@@ -1239,6 +1240,15 @@ int cgroup_attach_task(struct cgroup *cgrp, struct task_struct *tsk)
+ 			retval = ss->can_attach(ss, cgrp, tsk);
+ 			if (retval)
+ 				return retval;
++		} else if (!capable(CAP_SYS_ADMIN)) {
++			const struct cred *cred = current_cred(), *tcred;
++
++			/* No can_attach() - check perms generically */
++			tcred = __task_cred(tsk);
++			if (cred->euid != tcred->uid &&
++			    cred->euid != tcred->suid) {
++				return -EACCES;
++			}
+ 		}
+ 	}
+ 
+@@ -1289,7 +1299,6 @@ int cgroup_attach_task(struct cgroup *cgrp, struct task_struct *tsk)
+ static int attach_task_by_pid(struct cgroup *cgrp, u64 pid)
+ {
+ 	struct task_struct *tsk;
+-	const struct cred *cred = current_cred(), *tcred;
+ 	int ret;
+ 
+ 	if (pid) {
+@@ -1299,14 +1308,6 @@ static int attach_task_by_pid(struct cgroup *cgrp, u64 pid)
+ 			rcu_read_unlock();
+ 			return -ESRCH;
+ 		}
+-
+-		tcred = __task_cred(tsk);
+-		if (cred->euid &&
+-		    cred->euid != tcred->uid &&
+-		    cred->euid != tcred->suid) {
+-			rcu_read_unlock();
+-			return -EACCES;
+-		}
+ 		get_task_struct(tsk);
+ 		rcu_read_unlock();
+ 	} else {
+diff --git a/kernel/cgroup_freezer.c b/kernel/cgroup_freezer.c
+index fb249e2..39c3284 100644
+--- a/kernel/cgroup_freezer.c
++++ b/kernel/cgroup_freezer.c
+@@ -163,6 +163,14 @@ static int freezer_can_attach(struct cgroup_subsys *ss,
+ {
+ 	struct freezer *freezer;
+ 
++	if ((current != task) && (!capable(CAP_SYS_ADMIN))) {
++		const struct cred *cred = current_cred(), *tcred;
++
++		tcred = __task_cred(task);
++		if (cred->euid != tcred->uid && cred->euid != tcred->suid)
++			return -EPERM;
++	}
++
+ 	/*
+ 	 * Anything frozen can't move or be moved to/from.
+ 	 *
+diff --git a/kernel/cpuset.c b/kernel/cpuset.c
+index f76db9d..1f587fe 100644
+--- a/kernel/cpuset.c
++++ b/kernel/cpuset.c
+@@ -1357,6 +1357,13 @@ static int cpuset_can_attach(struct cgroup_subsys *ss,
+ 	struct cpuset *cs = cgroup_cs(cont);
+ 	int ret = 0;
+ 
++	if ((current != task) && (!capable(CAP_SYS_ADMIN))) {
++		const struct cred *cred = current_cred(), *tcred;
++
++		if (cred->euid != tcred->uid && cred->euid != tcred->suid)
++			return -EPERM;
++	}
++ 
+ 	if (cpumask_empty(cs->cpus_allowed) || nodes_empty(cs->mems_allowed))
+ 		return -ENOSPC;
+ 
+diff --git a/kernel/sched.c b/kernel/sched.c
+index db85e7d..f1e8560 100644
+--- a/kernel/sched.c
++++ b/kernel/sched.c
+@@ -9385,6 +9385,15 @@ static int
+ cpu_cgroup_can_attach(struct cgroup_subsys *ss, struct cgroup *cgrp,
+ 		      struct task_struct *tsk)
+ {
++	if ((current != tsk) && (!capable(CAP_SYS_NICE))) {
++		const struct cred *cred = current_cred(), *tcred;
++
++		tcred = __task_cred(tsk);
++
++		if (cred->euid != tcred->uid && cred->euid != tcred->suid)
++			return -EPERM;
++	}
++
+ #ifdef CONFIG_RT_GROUP_SCHED
+ 	if (!sched_rt_can_attach(cgroup_tg(cgrp), tsk))
+ 		return -EINVAL;
+-- 
+1.7.0.4
+

@@ -1,0 +1,40 @@
+From 17b6fc26dffa23917d4f587ed264fbb50d330646 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Fri, 20 Feb 2009 20:54:06 +0100
+Subject: [PATCH 035/247] Bluetooth: Permit BT_SECURITY also for L2CAP raw sockets
+
+Userspace pairing code can be simplified if it doesn't have to fall
+back to using L2CAP_LM in the case of L2CAP raw sockets. This patch
+allows the BT_SECURITY socket option to be used for these sockets.
+
+Signed-off-by: Johan Hedberg <johan.hedberg@nokia.com>
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/l2cap.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/net/bluetooth/l2cap.c b/net/bluetooth/l2cap.c
+index 7c6768c..db6fbf1 100644
+--- a/net/bluetooth/l2cap.c
++++ b/net/bluetooth/l2cap.c
+@@ -1308,7 +1308,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
+ 
+ 	switch (optname) {
+ 	case BT_SECURITY:
+-		if (sk->sk_type != SOCK_SEQPACKET) {
++		if (sk->sk_type != SOCK_SEQPACKET && sk->sk_type != SOCK_RAW) {
+ 			err = -EINVAL;
+ 			break;
+ 		}
+@@ -1455,7 +1455,7 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
+ 
+ 	switch (optname) {
+ 	case BT_SECURITY:
+-		if (sk->sk_type != SOCK_SEQPACKET) {
++		if (sk->sk_type != SOCK_SEQPACKET && sk->sk_type != SOCK_RAW) {
+ 			err = -EINVAL;
+ 			break;
+ 		}
+-- 
+1.7.0.4
+

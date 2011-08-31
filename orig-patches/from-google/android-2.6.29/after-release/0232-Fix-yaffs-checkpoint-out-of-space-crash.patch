@@ -1,0 +1,96 @@
+From b0e4fdd2edd06bd4f9abc89d8dc788c18e9cd521 Mon Sep 17 00:00:00 2001
+From: Charles Manning <cdhmanning@gmail.com>
+Date: Fri, 30 Oct 2009 12:08:15 +1300
+Subject: [PATCH 232/247] Fix yaffs checkpoint out of space crash
+ An ealy return from checkpoint opening caused the writing flag
+ to be set incorrectly which caused the wrong execution path during
+ the close.
+
+Also clean up space left behind by aborted checkpoints.
+
+Also jsut neaten up NULL handling.
+
+Signed-off-by: Charles Manning <cdhmanning@gmail.com>
+---
+ fs/yaffs2/yaffs_checkptrw.c |   26 ++++++++++++--------------
+ fs/yaffs2/yaffs_guts.c      |    3 +++
+ 2 files changed, 15 insertions(+), 14 deletions(-)
+
+diff --git a/fs/yaffs2/yaffs_checkptrw.c b/fs/yaffs2/yaffs_checkptrw.c
+index 66a4e7d..7b69a64 100644
+--- a/fs/yaffs2/yaffs_checkptrw.c
++++ b/fs/yaffs2/yaffs_checkptrw.c
+@@ -130,6 +130,9 @@ static void yaffs_CheckpointFindNextCheckpointBlock(yaffs_Device *dev)
+ int yaffs_CheckpointOpen(yaffs_Device *dev, int forWriting)
+ {
+ 
++
++	dev->checkpointOpenForWrite = forWriting;
++
+ 	/* Got the functions we need? */
+ 	if (!dev->writeChunkWithTagsToNAND ||
+ 			!dev->readChunkWithTagsFromNAND ||
+@@ -147,9 +150,6 @@ int yaffs_CheckpointOpen(yaffs_Device *dev, int forWriting)
+ 
+ 
+ 	dev->checkpointPageSequence = 0;
+-
+-	dev->checkpointOpenForWrite = forWriting;
+-
+ 	dev->checkpointByteCount = 0;
+ 	dev->checkpointSum = 0;
+ 	dev->checkpointXor = 0;
+@@ -358,11 +358,14 @@ int yaffs_CheckpointClose(yaffs_Device *dev)
+ 	if (dev->checkpointOpenForWrite) {
+ 		if (dev->checkpointByteOffset != 0)
+ 			yaffs_CheckpointFlushBuffer(dev);
+-	} else {
++	} else if(dev->checkpointBlockList){
+ 		int i;
+ 		for (i = 0; i < dev->blocksInCheckpoint && dev->checkpointBlockList[i] >= 0; i++) {
+-			yaffs_BlockInfo *bi = yaffs_GetBlockInfo(dev, dev->checkpointBlockList[i]);
+-			if (bi->blockState == YAFFS_BLOCK_STATE_EMPTY)
++			int blk = dev->checkpointBlockList[i];
++			yaffs_BlockInfo *bi = NULL;
++			if( dev->internalStartBlock <= blk && blk <= dev->internalEndBlock)
++				bi = yaffs_GetBlockInfo(dev, blk);
++			if (bi && bi->blockState == YAFFS_BLOCK_STATE_EMPTY)
+ 				bi->blockState = YAFFS_BLOCK_STATE_CHECKPOINT;
+ 			else {
+ 				/* Todo this looks odd... */
+@@ -390,15 +393,10 @@ int yaffs_CheckpointClose(yaffs_Device *dev)
+ 
+ int yaffs_CheckpointInvalidateStream(yaffs_Device *dev)
+ {
+-	/* Erase the first checksum block */
+-
+-	T(YAFFS_TRACE_CHECKPOINT, (TSTR("checkpoint invalidate"TENDSTR)));
++	/* Erase the checkpoint data */
+ 
+-	if (!yaffs_CheckpointSpaceOk(dev))
+-		return 0;
++	T(YAFFS_TRACE_CHECKPOINT, (TSTR("checkpoint invalidate of %d blocks"TENDSTR),
++		dev->blocksInCheckpoint));
+ 
+ 	return yaffs_CheckpointErase(dev);
+ }
+-
+-
+-
+diff --git a/fs/yaffs2/yaffs_guts.c b/fs/yaffs2/yaffs_guts.c
+index 155b746..05ff48d 100644
+--- a/fs/yaffs2/yaffs_guts.c
++++ b/fs/yaffs2/yaffs_guts.c
+@@ -7436,6 +7436,9 @@ int yaffs_GutsInitialise(yaffs_Device *dev)
+ 	yaffs_VerifyFreeChunks(dev);
+ 	yaffs_VerifyBlocks(dev);
+ 
++	/* Clean up any aborted checkpoint data */
++	if (!dev->isCheckpointed && dev->blocksInCheckpoint > 0)
++		yaffs_InvalidateCheckpoint(dev);
+ 
+ 	T(YAFFS_TRACE_TRACING,
+ 	  (TSTR("yaffs: yaffs_GutsInitialise() done.\n" TENDSTR)));
+-- 
+1.7.0.4
+

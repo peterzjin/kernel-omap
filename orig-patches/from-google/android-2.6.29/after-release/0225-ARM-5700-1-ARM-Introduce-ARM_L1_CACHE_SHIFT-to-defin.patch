@@ -1,0 +1,47 @@
+From 2071263b4b1b4ae419171a368e6fea9480076756 Mon Sep 17 00:00:00 2001
+From: Kirill A. Shutemov <kirill@shutemov.name>
+Date: Tue, 15 Sep 2009 10:23:53 +0100
+Subject: [PATCH 225/247] ARM: 5700/1: ARM: Introduce ARM_L1_CACHE_SHIFT to define cache line size
+
+Currently kernel believes that all ARM CPUs have L1_CACHE_SHIFT == 5.
+It's not true at least for CPUs based on Cortex-A8.
+
+List of CPUs with cache line size != 32 should be expanded later.
+
+Signed-off-by: Kirill A. Shutemov <kirill@shutemov.name>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+(cherry picked from commit 910a17e57ab6cd22b300bde4ce5f633f175c7ccd)
+---
+ arch/arm/include/asm/cache.h |    2 +-
+ arch/arm/mm/Kconfig          |    5 +++++
+ 2 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/include/asm/cache.h b/arch/arm/include/asm/cache.h
+index cb7a9e9..84778c1 100644
+--- a/arch/arm/include/asm/cache.h
++++ b/arch/arm/include/asm/cache.h
+@@ -4,7 +4,7 @@
+ #ifndef __ASMARM_CACHE_H
+ #define __ASMARM_CACHE_H
+ 
+-#define L1_CACHE_SHIFT		5
++#define L1_CACHE_SHIFT		CONFIG_ARM_L1_CACHE_SHIFT
+ #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+ 
+ #endif
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index d490f37..91a76f4 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -717,3 +717,8 @@ config CACHE_XSC3L2
+ 	select OUTER_CACHE
+ 	help
+ 	  This option enables the L2 cache on XScale3.
++
++config ARM_L1_CACHE_SHIFT
++	int
++	default 6 if ARCH_OMAP3
++	default 5
+-- 
+1.7.0.4
+

@@ -1,0 +1,27 @@
+From 70416fa2dd0095639fd9213b6d923ad442d87ec9 Mon Sep 17 00:00:00 2001
+From: San Mehat <san@google.com>
+Date: Mon, 14 Sep 2009 14:53:37 -0700
+Subject: [PATCH 197/247] ramconsole: Disable console capture upon receiving a magic sequence
+
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/staging/android/ram_console.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/staging/android/ram_console.c b/drivers/staging/android/ram_console.c
+index 3375c1c..4852503 100644
+--- a/drivers/staging/android/ram_console.c
++++ b/drivers/staging/android/ram_console.c
+@@ -137,6 +137,9 @@ ram_console_write(struct console *console, const char *s, unsigned int count)
+ 	if (buffer->size < ram_console_buffer_size)
+ 		buffer->size += count;
+ 	ram_console_update_header();
++	if (!strncmp(s, "!@#$ RAMCONSOLE_DISABLE $#@!", 28)) {
++		console->flags &= ~CON_ENABLED;
++	}
+ }
+ 
+ static struct console ram_console = {
+-- 
+1.7.0.4
+

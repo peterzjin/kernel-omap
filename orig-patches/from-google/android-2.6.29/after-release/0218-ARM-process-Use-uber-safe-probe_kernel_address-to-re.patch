@@ -1,0 +1,28 @@
+From 16dc5b5c657852c88d3242a59200e7cabd8c5e55 Mon Sep 17 00:00:00 2001
+From: San Mehat <san@google.com>
+Date: Sat, 3 Oct 2009 12:24:54 -0700
+Subject: [PATCH 218/247] [ARM] process: Use uber-safe probe_kernel_address() to read mem when dumping.
+
+This prevents the dump from taking pagefaults / external aborts.
+
+Signed-off-by: San Mehat <san@google.com>
+---
+ arch/arm/kernel/process.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 994b4d3..f884b85 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -234,7 +234,7 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
+ 		printk("%04lx ", (unsigned long)p & 0xffff);
+ 		for (j = 0; j < 8; j++) {
+ 			u32	data;
+-			if (__get_user(data, p)) {
++			if (probe_kernel_address(p, data)) {
+ 				printk(" ********");
+ 			} else {
+ 				printk(" %08x", data);
+-- 
+1.7.0.4
+

@@ -1,0 +1,284 @@
+From ca7aec8e2723be6d3916674cc6aac562c412b783 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Thu, 15 Jan 2009 21:56:48 +0100
+Subject: [PATCH 004/247] Bluetooth: Add support for deferring RFCOMM connection setup
+
+In order to decide if listening RFCOMM sockets should be accept()ed
+the BD_ADDR of the remote device needs to be known. This patch adds
+a socket option which defines a timeout for deferring the actual
+connection setup.
+
+The connection setup is done after reading from the socket for the
+first time. Until then writing to the socket returns ENOTCONN.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ include/net/bluetooth/rfcomm.h |    6 +++-
+ net/bluetooth/rfcomm/core.c    |   56 +++++++++++++++++++++++++++++----------
+ net/bluetooth/rfcomm/sock.c    |   44 ++++++++++++++++++++++++++++++-
+ 3 files changed, 88 insertions(+), 18 deletions(-)
+
+diff --git a/include/net/bluetooth/rfcomm.h b/include/net/bluetooth/rfcomm.h
+index 4dc8d92..71b45f4 100644
+--- a/include/net/bluetooth/rfcomm.h
++++ b/include/net/bluetooth/rfcomm.h
+@@ -185,6 +185,7 @@ struct rfcomm_dlc {
+ 	u8            out;
+ 
+ 	u32           link_mode;
++	u32           defer_setup;
+ 
+ 	uint          mtu;
+ 	uint          cfc;
+@@ -202,10 +203,11 @@ struct rfcomm_dlc {
+ #define RFCOMM_RX_THROTTLED 0
+ #define RFCOMM_TX_THROTTLED 1
+ #define RFCOMM_TIMED_OUT    2
+-#define RFCOMM_MSC_PENDING  3 
++#define RFCOMM_MSC_PENDING  3
+ #define RFCOMM_AUTH_PENDING 4
+ #define RFCOMM_AUTH_ACCEPT  5
+ #define RFCOMM_AUTH_REJECT  6
++#define RFCOMM_DEFER_SETUP  7
+ 
+ /* Scheduling flags and events */
+ #define RFCOMM_SCHED_STATE  0
+@@ -239,6 +241,7 @@ int  rfcomm_dlc_close(struct rfcomm_dlc *d, int reason);
+ int  rfcomm_dlc_send(struct rfcomm_dlc *d, struct sk_buff *skb);
+ int  rfcomm_dlc_set_modem_status(struct rfcomm_dlc *d, u8 v24_sig);
+ int  rfcomm_dlc_get_modem_status(struct rfcomm_dlc *d, u8 *v24_sig);
++void rfcomm_dlc_accept(struct rfcomm_dlc *d);
+ 
+ #define rfcomm_dlc_lock(d)     spin_lock(&d->lock)
+ #define rfcomm_dlc_unlock(d)   spin_unlock(&d->lock)
+@@ -333,7 +336,6 @@ struct rfcomm_dev_req {
+ 	bdaddr_t src;
+ 	bdaddr_t dst;
+ 	u8       channel;
+-	
+ };
+ 
+ struct rfcomm_dev_info {
+diff --git a/net/bluetooth/rfcomm/core.c b/net/bluetooth/rfcomm/core.c
+index acd84fd..edee49e 100644
+--- a/net/bluetooth/rfcomm/core.c
++++ b/net/bluetooth/rfcomm/core.c
+@@ -421,9 +421,16 @@ static int __rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
+ 			d, d->state, d->dlci, err, s);
+ 
+ 	switch (d->state) {
+-	case BT_CONNECTED:
+-	case BT_CONFIG:
+ 	case BT_CONNECT:
++	case BT_CONFIG:
++		if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
++			set_bit(RFCOMM_AUTH_REJECT, &d->flags);
++			rfcomm_schedule(RFCOMM_SCHED_AUTH);
++			break;
++		}
++		/* Fall through */
++
++	case BT_CONNECTED:
+ 		d->state = BT_DISCONN;
+ 		if (skb_queue_empty(&d->tx_queue)) {
+ 			rfcomm_send_disc(s, d->dlci);
+@@ -434,6 +441,14 @@ static int __rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
+ 		}
+ 		break;
+ 
++	case BT_OPEN:
++		if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
++			set_bit(RFCOMM_AUTH_REJECT, &d->flags);
++			rfcomm_schedule(RFCOMM_SCHED_AUTH);
++			break;
++		}
++		/* Fall through */
++
+ 	default:
+ 		rfcomm_dlc_clear_timer(d);
+ 
+@@ -1162,7 +1177,7 @@ static int rfcomm_recv_disc(struct rfcomm_session *s, u8 dlci)
+ 	return 0;
+ }
+ 
+-static void rfcomm_dlc_accept(struct rfcomm_dlc *d)
++void rfcomm_dlc_accept(struct rfcomm_dlc *d)
+ {
+ 	struct sock *sk = d->session->sock->sk;
+ 
+@@ -1181,6 +1196,20 @@ static void rfcomm_dlc_accept(struct rfcomm_dlc *d)
+ 	rfcomm_send_msc(d->session, 1, d->dlci, d->v24_sig);
+ }
+ 
++static void rfcomm_check_accept(struct rfcomm_dlc *d)
++{
++	if (rfcomm_check_link_mode(d)) {
++		set_bit(RFCOMM_AUTH_PENDING, &d->flags);
++		rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
++	} else {
++		if (d->defer_setup) {
++			set_bit(RFCOMM_DEFER_SETUP, &d->flags);
++			rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
++		} else
++			rfcomm_dlc_accept(d);
++	}
++}
++
+ static int rfcomm_recv_sabm(struct rfcomm_session *s, u8 dlci)
+ {
+ 	struct rfcomm_dlc *d;
+@@ -1203,11 +1232,7 @@ static int rfcomm_recv_sabm(struct rfcomm_session *s, u8 dlci)
+ 	if (d) {
+ 		if (d->state == BT_OPEN) {
+ 			/* DLC was previously opened by PN request */
+-			if (rfcomm_check_link_mode(d)) {
+-				set_bit(RFCOMM_AUTH_PENDING, &d->flags);
+-				rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
+-			} else
+-				rfcomm_dlc_accept(d);
++			rfcomm_check_accept(d);
+ 		}
+ 		return 0;
+ 	}
+@@ -1219,11 +1244,7 @@ static int rfcomm_recv_sabm(struct rfcomm_session *s, u8 dlci)
+ 		d->addr = __addr(s->initiator, dlci);
+ 		rfcomm_dlc_link(s, d);
+ 
+-		if (rfcomm_check_link_mode(d)) {
+-			set_bit(RFCOMM_AUTH_PENDING, &d->flags);
+-			rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
+-		} else
+-			rfcomm_dlc_accept(d);
++		rfcomm_check_accept(d);
+ 	} else {
+ 		rfcomm_send_dm(s, dlci);
+ 	}
+@@ -1717,8 +1738,13 @@ static inline void rfcomm_process_dlcs(struct rfcomm_session *s)
+ 			if (d->out) {
+ 				rfcomm_send_pn(s, 1, d);
+ 				rfcomm_dlc_set_timer(d, RFCOMM_CONN_TIMEOUT);
+-			} else
+-				rfcomm_dlc_accept(d);
++			} else {
++				if (d->defer_setup) {
++					set_bit(RFCOMM_DEFER_SETUP, &d->flags);
++					rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
++				} else
++					rfcomm_dlc_accept(d);
++			}
+ 			if (d->link_mode & RFCOMM_LM_SECURE) {
+ 				struct sock *sk = s->sock->sk;
+ 				hci_conn_change_link_key(l2cap_pi(sk)->conn->hcon);
+diff --git a/net/bluetooth/rfcomm/sock.c b/net/bluetooth/rfcomm/sock.c
+index 65dd713..d37a829 100644
+--- a/net/bluetooth/rfcomm/sock.c
++++ b/net/bluetooth/rfcomm/sock.c
+@@ -262,8 +262,10 @@ static void rfcomm_sock_init(struct sock *sk, struct sock *parent)
+ 	if (parent) {
+ 		sk->sk_type = parent->sk_type;
+ 		pi->link_mode = rfcomm_pi(parent)->link_mode;
++		pi->dlc->defer_setup = bt_sk(parent)->defer_setup;
+ 	} else {
+ 		pi->link_mode = 0;
++		pi->dlc->defer_setup = 0;
+ 	}
+ 
+ 	pi->dlc->link_mode = pi->link_mode;
+@@ -554,6 +556,9 @@ static int rfcomm_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
+ 	struct sk_buff *skb;
+ 	int sent = 0;
+ 
++	if (test_bit(RFCOMM_DEFER_SETUP, &d->flags))
++		return -ENOTCONN;
++
+ 	if (msg->msg_flags & MSG_OOB)
+ 		return -EOPNOTSUPP;
+ 
+@@ -633,10 +638,16 @@ static int rfcomm_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
+ 			       struct msghdr *msg, size_t size, int flags)
+ {
+ 	struct sock *sk = sock->sk;
++	struct rfcomm_dlc *d = rfcomm_pi(sk)->dlc;
+ 	int err = 0;
+ 	size_t target, copied = 0;
+ 	long timeo;
+ 
++	if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
++		rfcomm_dlc_accept(d);
++		return 0;
++	}
++
+ 	if (flags & MSG_OOB)
+ 		return -EOPNOTSUPP;
+ 
+@@ -746,6 +757,7 @@ static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, c
+ {
+ 	struct sock *sk = sock->sk;
+ 	int err = 0;
++	u32 opt;
+ 
+ 	BT_DBG("sk %p", sk);
+ 
+@@ -755,6 +767,20 @@ static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, c
+ 	lock_sock(sk);
+ 
+ 	switch (optname) {
++	case BT_DEFER_SETUP:
++		if (sk->sk_state != BT_BOUND && sk->sk_state != BT_LISTEN) {
++			err = -EINVAL;
++			break;
++		}
++
++		if (get_user(opt, (u32 __user *) optval)) {
++			err = -EFAULT;
++			break;
++		}
++
++		bt_sk(sk)->defer_setup = opt;
++		break;
++
+ 	default:
+ 		err = -ENOPROTOOPT;
+ 		break;
+@@ -785,7 +811,8 @@ static int rfcomm_sock_getsockopt_old(struct socket *sock, int optname, char __u
+ 		break;
+ 
+ 	case RFCOMM_CONNINFO:
+-		if (sk->sk_state != BT_CONNECTED) {
++		if (sk->sk_state != BT_CONNECTED &&
++					!rfcomm_pi(sk)->dlc->defer_setup) {
+ 			err = -ENOTCONN;
+ 			break;
+ 		}
+@@ -826,6 +853,17 @@ static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, c
+ 	lock_sock(sk);
+ 
+ 	switch (optname) {
++	case BT_DEFER_SETUP:
++		if (sk->sk_state != BT_BOUND && sk->sk_state != BT_LISTEN) {
++			err = -EINVAL;
++			break;
++		}
++
++		if (put_user(bt_sk(sk)->defer_setup, (u32 __user *) optval))
++			err = -EFAULT;
++
++		break;
++
+ 	default:
+ 		err = -ENOPROTOOPT;
+ 		break;
+@@ -938,6 +976,10 @@ int rfcomm_connect_ind(struct rfcomm_session *s, u8 channel, struct rfcomm_dlc *
+ 
+ done:
+ 	bh_unlock_sock(parent);
++
++	if (bt_sk(parent)->defer_setup)
++		parent->sk_state_change(parent);
++
+ 	return result;
+ }
+ 
+-- 
+1.7.0.4
+

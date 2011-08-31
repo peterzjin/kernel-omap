@@ -1,0 +1,25 @@
+From 7077e27531f83b9d6f019893409e2aff5ed2cb16 Mon Sep 17 00:00:00 2001
+From: Mike Lockwood <lockwood@android.com>
+Date: Fri, 7 Aug 2009 08:09:05 -0400
+Subject: [PATCH 163/247] usb: gadget: android: Add dependency on switch driver.
+
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 08baf4b..71e3db9 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -701,6 +701,7 @@ config USB_G_PRINTER
+ 
+ config USB_ANDROID
+ 	tristate "Android Gadget"
++	depends on SWITCH
+ 	help
+ 	  The Android gadget provides mass storage and adb transport.
+ 
+-- 
+1.7.0.4
+

@@ -1,0 +1,81 @@
+From 7d0a42ff97c88e4e113d153fbf4345ac58142f80 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Fri, 16 Jan 2009 08:17:51 +0100
+Subject: [PATCH 011/247] Bluetooth: Pause RFCOMM TX when encryption drops
+
+A role switch with devices following the Bluetooth pre-2.1 standards
+or without Encryption Pause and Resume support is not possible if
+encryption is enabled. Most newer headsets require the role switch,
+but also require that the connection is encrypted.
+
+For connections with a high security mode setting, the link will be
+immediately dropped. When the connection uses medium security mode
+setting, then a grace period is introduced where the TX is halted and
+the remote device gets a change to re-enable encryption after the
+role switch. If not re-enabled the link will be dropped.
+
+Based on initial work by Ville Tervo <ville.tervo@nokia.com>
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ include/net/bluetooth/rfcomm.h |    9 +++++----
+ net/bluetooth/rfcomm/core.c    |   23 +++++++++++++++++------
+ 2 files changed, 22 insertions(+), 10 deletions(-)
+
+diff --git a/include/net/bluetooth/rfcomm.h b/include/net/bluetooth/rfcomm.h
+index bda68d8..8007261 100644
+--- a/include/net/bluetooth/rfcomm.h
++++ b/include/net/bluetooth/rfcomm.h
+@@ -204,10 +204,11 @@ struct rfcomm_dlc {
+ #define RFCOMM_TX_THROTTLED 1
+ #define RFCOMM_TIMED_OUT    2
+ #define RFCOMM_MSC_PENDING  3
+-#define RFCOMM_AUTH_PENDING 4
+-#define RFCOMM_AUTH_ACCEPT  5
+-#define RFCOMM_AUTH_REJECT  6
+-#define RFCOMM_DEFER_SETUP  7
++#define RFCOMM_SEC_PENDING  4
++#define RFCOMM_AUTH_PENDING 5
++#define RFCOMM_AUTH_ACCEPT  6
++#define RFCOMM_AUTH_REJECT  7
++#define RFCOMM_DEFER_SETUP  8
+ 
+ /* Scheduling flags and events */
+ #define RFCOMM_SCHED_STATE  0
+diff --git a/net/bluetooth/rfcomm/core.c b/net/bluetooth/rfcomm/core.c
+index db83f92..dafaee9 100644
+--- a/net/bluetooth/rfcomm/core.c
++++ b/net/bluetooth/rfcomm/core.c
+@@ -1979,12 +1979,23 @@ static void rfcomm_security_cfm(struct hci_conn *conn, u8 status, u8 encrypt)
+ 	list_for_each_safe(p, n, &s->dlcs) {
+ 		d = list_entry(p, struct rfcomm_dlc, list);
+ 
+-		if (!status && encrypt == 0x00 &&
+-				d->sec_level == BT_SECURITY_HIGH &&
+-					(d->state == BT_CONNECTED ||
+-						d->state == BT_CONFIG)) {
+-			__rfcomm_dlc_close(d, ECONNREFUSED);
+-			continue;
++		if (test_and_clear_bit(RFCOMM_SEC_PENDING, &d->flags)) {
++			rfcomm_dlc_clear_timer(d);
++			if (status || encrypt == 0x00) {
++				__rfcomm_dlc_close(d, ECONNREFUSED);
++				continue;
++			}
++		}
++
++		if (d->state == BT_CONNECTED && !status && encrypt == 0x00) {
++			if (d->sec_level == BT_SECURITY_MEDIUM) {
++				set_bit(RFCOMM_SEC_PENDING, &d->flags);
++				rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
++				continue;
++			} else if (d->sec_level == BT_SECURITY_HIGH) {
++				__rfcomm_dlc_close(d, ECONNREFUSED);
++				continue;
++			}
+ 		}
+ 
+ 		if (!test_and_clear_bit(RFCOMM_AUTH_PENDING, &d->flags))
+-- 
+1.7.0.4
+

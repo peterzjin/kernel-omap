@@ -1,0 +1,26 @@
+From a79a717e4a79036c95e21e95214a8c35b146b880 Mon Sep 17 00:00:00 2001
+From: Ken Kessler <kenny.kessler@motorola.com>
+Date: Fri, 29 May 2009 11:52:30 -0700
+Subject: [PATCH 126/247] usb: gadget: android: Allow usb charging to draw up to 500mA instead of 250.
+
+Signed-off-by: Rebecca Schultz Zavin <rebecca@android.com>
+---
+ drivers/usb/gadget/android.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/usb/gadget/android.c b/drivers/usb/gadget/android.c
+index ace03e0..e763524 100644
+--- a/drivers/usb/gadget/android.c
++++ b/drivers/usb/gadget/android.c
+@@ -130,7 +130,7 @@ static struct usb_configuration android_config_driver = {
+ 	.bind		= android_bind_config,
+ 	.bConfigurationValue = 1,
+ 	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
+-	.bMaxPower	= 0x80, /* 250ma */
++	.bMaxPower	= 0xFA, /* 500ma */
+ };
+ 
+ static int __init android_bind(struct usb_composite_dev *cdev)
+-- 
+1.7.0.4
+

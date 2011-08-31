@@ -1,0 +1,65 @@
+From d57cc7864aed1ccd13b57340d215bfc1d527713f Mon Sep 17 00:00:00 2001
+From: Joe Swantek <joseph.swantek@motorola.com>
+Date: Wed, 22 Jul 2009 20:16:06 -0500
+Subject: [PATCH 164/247] drivers: usb: gadget: Add helper function for installing ACM gadget function.
+
+Submitted on behalf of James Luan <James.Luan@motorola.com>
+
+Signed-off-by: Joe Swantek <joseph.swantek@motorola.com>
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/f_acm.c |    9 +++++++++
+ drivers/usb/gadget/f_acm.h |   24 ++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/usb/gadget/f_acm.h
+
+diff --git a/drivers/usb/gadget/f_acm.c b/drivers/usb/gadget/f_acm.c
+index c1d34df..a283c1e 100644
+--- a/drivers/usb/gadget/f_acm.c
++++ b/drivers/usb/gadget/f_acm.c
+@@ -761,3 +761,12 @@ int __init acm_bind_config(struct usb_configuration *c, u8 port_num)
+ 		kfree(acm);
+ 	return status;
+ }
++
++int __init acm_function_add(struct usb_composite_dev *cdev,
++	struct usb_configuration *c)
++{
++	int ret = acm_bind_config(c, 0);
++	if (ret == 0)
++		gserial_setup(c->cdev->gadget, 1);
++	return ret;
++}
+diff --git a/drivers/usb/gadget/f_acm.h b/drivers/usb/gadget/f_acm.h
+new file mode 100644
+index 0000000..8e27b34
+--- /dev/null
++++ b/drivers/usb/gadget/f_acm.h
+@@ -0,0 +1,24 @@
++/*
++ * Gadget Driver for Android ACM
++ *
++ * Copyright (C) 2009 Motorola, Inc.
++ * Author:
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __F_ACM_H
++#define __F_ACM_H
++
++int acm_function_add(struct usb_composite_dev *cdev,
++	struct usb_configuration *c);
++
++#endif /* __F_ACM_H */
+-- 
+1.7.0.4
+

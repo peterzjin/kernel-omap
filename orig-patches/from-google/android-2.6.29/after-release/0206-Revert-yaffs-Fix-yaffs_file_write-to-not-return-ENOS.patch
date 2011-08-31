@@ -1,0 +1,31 @@
+From 16259922b79cc7be7cec7f518f8729e0e66d9aa6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Wed, 16 Sep 2009 18:33:46 -0700
+Subject: [PATCH 206/247] Revert "yaffs: Fix yaffs_file_write to not return -ENOSPC when there is nothing to write"
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This reverts commit 37db7a3d4d75ce64b621484563d852a0813737e1.
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+---
+ fs/yaffs2/yaffs_fs.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/fs/yaffs2/yaffs_fs.c b/fs/yaffs2/yaffs_fs.c
+index 2288eee..30ae7c7 100644
+--- a/fs/yaffs2/yaffs_fs.c
++++ b/fs/yaffs2/yaffs_fs.c
+@@ -1075,7 +1075,7 @@ static ssize_t yaffs_file_write(struct file *f, const char *buf, size_t n,
+ 
+ 	}
+ 	yaffs_GrossUnlock(dev);
+-	return (!nWritten && n) ? -ENOSPC : nWritten;
++	return nWritten == 0 ? -ENOSPC : nWritten;
+ }
+ 
+ /* Space holding and freeing is done to ensure we have space available for write_begin/end */
+-- 
+1.7.0.4
+

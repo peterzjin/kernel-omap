@@ -1,0 +1,33 @@
+From 725138d21c1d3d4f0a2ca3b9eb0c1c3f17fd6852 Mon Sep 17 00:00:00 2001
+From: San Mehat <san@google.com>
+Date: Thu, 30 Jul 2009 08:23:22 -0700
+Subject: [PATCH 152/247] mmc: card: Add MMC_BLOCK_DEFERRED_RESUME option to Kconfig
+
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/mmc/card/Kconfig |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mmc/card/Kconfig b/drivers/mmc/card/Kconfig
+index 76d921c..176199e 100644
+--- a/drivers/mmc/card/Kconfig
++++ b/drivers/mmc/card/Kconfig
+@@ -39,6 +39,15 @@ config MMC_BLOCK_PARANOID_RESUME
+         help
+           Nohelp
+ 
++config MMC_BLOCK_DEFERRED_RESUME
++	bool "Deferr MMC layer resume until I/O is requested"
++	depends on MMC_BLOCK
++	default n
++	help
++	  Say Y here to enable deferred MMC resume until I/O
++	  is requested. This will reduce overall resume latency and
++	  save power when theres an SD card inserted but not being used.
++
+ config SDIO_UART
+ 	tristate "SDIO UART/GPS class support"
+ 	help
+-- 
+1.7.0.4
+

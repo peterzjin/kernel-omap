@@ -1,0 +1,29 @@
+From 0bdcd41c3693827df10ec24d04f37db3ec04c571 Mon Sep 17 00:00:00 2001
+From: Steinar H. Gunderson <sesse@google.com>
+Date: Wed, 15 Apr 2009 15:01:33 +0200
+Subject: [PATCH 118/247] net: Fix compilation of the IPv6 module
+
+Fix compilation of the IPv6 module -- current->euid does not exist anymore,
+current_euid() is what needs to be used.
+
+Signed-off-by: Steinar H. Gunderson <sesse@google.com>
+---
+ net/ipv6/af_inet6.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/net/ipv6/af_inet6.c b/net/ipv6/af_inet6.c
+index c30f24b..a52060d 100644
+--- a/net/ipv6/af_inet6.c
++++ b/net/ipv6/af_inet6.c
+@@ -90,7 +90,7 @@ static __inline__ struct ipv6_pinfo *inet6_sk_generic(struct sock *sk)
+ #ifdef CONFIG_ANDROID_PARANOID_NETWORK
+ static inline int current_has_network(void)
+ {
+-	return (!current->euid || in_egroup_p(AID_INET) ||
++	return (!current_euid() || in_egroup_p(AID_INET) ||
+ 		in_egroup_p(AID_NET_RAW));
+ }
+ static inline int current_has_cap(int cap)
+-- 
+1.7.0.4
+

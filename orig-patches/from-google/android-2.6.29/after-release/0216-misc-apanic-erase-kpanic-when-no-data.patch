@@ -1,0 +1,50 @@
+From 83f44aa8e5386352c1d1df9b448b166456e7a8af Mon Sep 17 00:00:00 2001
+From: Tom Zhu <a2289c@android-hal-04.(none)>
+Date: Thu, 24 Sep 2009 10:58:50 -0500
+Subject: [PATCH 216/247] misc: apanic: erase kpanic when no data
+
+erase kpanic partition when there is no data(console and thread)
+
+Signed-off-by: Tom Zhu <a2289c@android-hal-04.(none)>
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/misc/apanic.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/misc/apanic.c b/drivers/misc/apanic.c
+index f50881b..ca875f8 100644
+--- a/drivers/misc/apanic.c
++++ b/drivers/misc/apanic.c
+@@ -297,6 +297,7 @@ static void mtd_panic_notify_add(struct mtd_info *mtd)
+ 	struct panic_header *hdr = ctx->bounce;
+ 	size_t len;
+ 	int rc;
++	int    proc_entry_created = 0;
+ 
+ 	if (strcmp(mtd->name, CONFIG_APANIC_PLABEL))
+ 		return;
+@@ -358,6 +359,7 @@ static void mtd_panic_notify_add(struct mtd_info *mtd)
+ 			ctx->apanic_console->write_proc = apanic_proc_write;
+ 			ctx->apanic_console->size = hdr->console_length;
+ 			ctx->apanic_console->data = (void *) 1;
++			proc_entry_created = 1;
+ 		}
+ 	}
+ 
+@@ -372,9 +374,13 @@ static void mtd_panic_notify_add(struct mtd_info *mtd)
+ 			ctx->apanic_threads->write_proc = apanic_proc_write;
+ 			ctx->apanic_threads->size = hdr->threads_length;
+ 			ctx->apanic_threads->data = (void *) 2;
++			proc_entry_created = 1;
+ 		}
+ 	}
+ 
++	if (!proc_entry_created)
++		mtd_panic_erase();
++
+ 	return;
+ out_err:
+ 	ctx->mtd = NULL;
+-- 
+1.7.0.4
+

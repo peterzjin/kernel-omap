@@ -1,0 +1,51 @@
+From 44269bacf56ed5248815e6d11da4f6cfaf487953 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Mon, 30 Mar 2009 21:07:24 -0700
+Subject: [PATCH 046/247] binder: mmap fixes.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Only allow a binder file pointer to be mmapped once. The buffer management
+code cannot deal with more then one area.
+Also remove leftover mutex_unlock if mmap fails.
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+---
+ drivers/staging/android/binder.c |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/staging/android/binder.c b/drivers/staging/android/binder.c
+index 39871da..761f5d6 100644
+--- a/drivers/staging/android/binder.c
++++ b/drivers/staging/android/binder.c
+@@ -2694,6 +2694,12 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
+ 	}
+ 	vma->vm_flags = (vma->vm_flags | VM_DONTCOPY) & ~VM_MAYWRITE;
+ 
++	if (proc->buffer) {
++		ret = -EBUSY;
++		failure_string = "already mapped";
++		goto err_already_mapped;
++	}
++
+ 	area = get_vm_area(vma->vm_end - vma->vm_start, VM_IOREMAP);
+ 	if (area == NULL) {
+ 		ret = -ENOMEM;
+@@ -2741,10 +2747,12 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
+ 
+ err_alloc_small_buf_failed:
+ 	kfree(proc->pages);
++	proc->pages = NULL;
+ err_alloc_pages_failed:
+ 	vfree(proc->buffer);
++	proc->buffer = NULL;
+ err_get_vm_area_failed:
+-	mutex_unlock(&binder_lock);
++err_already_mapped:
+ err_bad_arg:
+ 	printk(KERN_ERR "binder_mmap: %d %lx-%lx %s failed %d\n", proc->pid, vma->vm_start, vma->vm_end, failure_string, ret);
+ 	return ret;
+-- 
+1.7.0.4
+

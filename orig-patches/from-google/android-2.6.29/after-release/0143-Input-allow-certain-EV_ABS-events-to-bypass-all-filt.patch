@@ -1,0 +1,71 @@
+From b63575c57d01d7f438f5de7f9a142343bff0184f Mon Sep 17 00:00:00 2001
+From: Henrik Rydberg <rydberg@euromail.se>
+Date: Tue, 28 Apr 2009 07:45:31 -0700
+Subject: [PATCH 143/247] Input: allow certain EV_ABS events to bypass all filtering
+
+With the upcoming multi-touch interface as an example, there is
+a need to make certain that all reported events actually get passed
+to the event handler. This patch equips the input core with the
+ability to bypass all filtering for certain EV_ABS events.
+
+Signed-off-by: Henrik Rydberg <rydberg@euromail.se>
+Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+---
+ drivers/input/input.c |   23 +++++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/input/input.c b/drivers/input/input.c
+index 1730d73..6550ce8 100644
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -29,6 +29,14 @@ MODULE_LICENSE("GPL");
+ 
+ #define INPUT_DEVICES	256
+ 
++/*
++ * EV_ABS events which should not be cached are listed here.
++ */
++static unsigned int input_abs_bypass_init_data[] __initdata = {
++	0
++};
++static unsigned long input_abs_bypass[BITS_TO_LONGS(ABS_CNT)];
++
+ static LIST_HEAD(input_dev_list);
+ static LIST_HEAD(input_handler_list);
+ 
+@@ -185,6 +193,11 @@ static void input_handle_event(struct input_dev *dev,
+ 	case EV_ABS:
+ 		if (is_event_supported(code, dev->absbit, ABS_MAX)) {
+ 
++			if (test_bit(code, input_abs_bypass)) {
++				disposition = INPUT_PASS_TO_HANDLERS;
++				break;
++			}
++
+ 			value = input_defuzz_abs_event(value,
+ 					dev->abs[code], dev->absfuzz[code]);
+ 
+@@ -1630,10 +1643,20 @@ static const struct file_operations input_fops = {
+ 	.open = input_open_file,
+ };
+ 
++static void __init input_init_abs_bypass(void)
++{
++	const unsigned int *p;
++
++	for (p = input_abs_bypass_init_data; *p; p++)
++		input_abs_bypass[BIT_WORD(*p)] |= BIT_MASK(*p);
++}
++
+ static int __init input_init(void)
+ {
+ 	int err;
+ 
++	input_init_abs_bypass();
++
+ 	err = class_register(&input_class);
+ 	if (err) {
+ 		printk(KERN_ERR "input: unable to register input_dev class\n");
+-- 
+1.7.0.4
+

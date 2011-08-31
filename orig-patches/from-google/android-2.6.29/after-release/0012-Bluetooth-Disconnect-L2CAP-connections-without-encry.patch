@@ -1,0 +1,76 @@
+From 0a9309a8cd09333e4aef797915b3aa7603bbb8d9 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Thu, 15 Jan 2009 21:58:44 +0100
+Subject: [PATCH 012/247] Bluetooth: Disconnect L2CAP connections without encryption
+
+For L2CAP connections with high security setting, the link will be
+immediately dropped when the encryption gets disabled. For L2CAP
+connections with medium security there will be grace period where
+the remote device has the chance to re-enable encryption. If it
+doesn't happen then the link will also be disconnected.
+
+The requirement for the grace period with medium security comes from
+Bluetooth 2.0 and earlier devices that require role switching.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/l2cap.c |   26 +++++++++++++++++++-------
+ 1 files changed, 19 insertions(+), 7 deletions(-)
+
+diff --git a/net/bluetooth/l2cap.c b/net/bluetooth/l2cap.c
+index e899a93..b2d279c 100644
+--- a/net/bluetooth/l2cap.c
++++ b/net/bluetooth/l2cap.c
+@@ -77,7 +77,9 @@ static void l2cap_sock_timeout(unsigned long arg)
+ 
+ 	bh_lock_sock(sk);
+ 
+-	if (sk->sk_state == BT_CONNECT &&
++	if (sk->sk_state == BT_CONNECTED || sk->sk_state == BT_CONFIG)
++		reason = ECONNREFUSED;
++	else if (sk->sk_state == BT_CONNECT &&
+ 				l2cap_pi(sk)->sec_level != BT_SECURITY_SDP)
+ 		reason = ECONNREFUSED;
+ 	else
+@@ -2400,6 +2402,20 @@ static int l2cap_disconn_ind(struct hci_conn *hcon, u8 reason)
+ 	return 0;
+ }
+ 
++static inline void l2cap_check_encryption(struct sock *sk, u8 encrypt)
++{
++	if (encrypt == 0x00) {
++		if (l2cap_pi(sk)->sec_level == BT_SECURITY_MEDIUM) {
++			l2cap_sock_clear_timer(sk);
++			l2cap_sock_set_timer(sk, HZ * 5);
++		} else if (l2cap_pi(sk)->sec_level == BT_SECURITY_HIGH)
++			__l2cap_sock_close(sk, ECONNREFUSED);
++	} else {
++		if (l2cap_pi(sk)->sec_level == BT_SECURITY_MEDIUM)
++			l2cap_sock_clear_timer(sk);
++	}
++}
++
+ static int l2cap_security_cfm(struct hci_conn *hcon, u8 status, u8 encrypt)
+ {
+ 	struct l2cap_chan_list *l;
+@@ -2416,15 +2432,11 @@ static int l2cap_security_cfm(struct hci_conn *hcon, u8 status, u8 encrypt)
+ 	read_lock(&l->lock);
+ 
+ 	for (sk = l->head; sk; sk = l2cap_pi(sk)->next_c) {
+-		struct l2cap_pinfo *pi = l2cap_pi(sk);
+-
+ 		bh_lock_sock(sk);
+ 
+-		if (!status && encrypt == 0x00 &&
+-				pi->sec_level == BT_SECURITY_HIGH &&
+-					(sk->sk_state == BT_CONNECTED ||
++		if (!status && (sk->sk_state == BT_CONNECTED ||
+ 						sk->sk_state == BT_CONFIG)) {
+-			__l2cap_sock_close(sk, ECONNREFUSED);
++			l2cap_check_encryption(sk, encrypt);
+ 			bh_unlock_sock(sk);
+ 			continue;
+ 		}
+-- 
+1.7.0.4
+

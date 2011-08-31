@@ -1,0 +1,34 @@
+From e7f60c444541cf27745a6f3ddd5d90f972b07ef4 Mon Sep 17 00:00:00 2001
+From: Jaikumar Ganesh <jaikumar@google.com>
+Date: Mon, 2 Feb 2009 18:03:57 -0800
+Subject: [PATCH 017/247] Bluetooth: When encryption is dropped, do not send RFCOMM packets
+
+During a role change with pre-Bluetooth 2.1 devices, the remote side drops
+the encryption of the RFCOMM connection. We allow a grace period for the
+encryption to be re-established, before dropping the connection. During
+this grace period, the RFCOMM_SEC_PENDING flag is set. Check this flag
+before sending RFCOMM packets.
+
+Signed-off-by: Jaikumar Ganesh <jaikumar@google.com>
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/rfcomm/core.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/net/bluetooth/rfcomm/core.c b/net/bluetooth/rfcomm/core.c
+index ad0e25a..3717c25 100644
+--- a/net/bluetooth/rfcomm/core.c
++++ b/net/bluetooth/rfcomm/core.c
+@@ -1749,6 +1749,9 @@ static inline void rfcomm_process_dlcs(struct rfcomm_session *s)
+ 			continue;
+ 		}
+ 
++		if (test_bit(RFCOMM_SEC_PENDING, &d->flags))
++			continue;
++
+ 		if (test_bit(RFCOMM_TX_THROTTLED, &s->flags))
+ 			continue;
+ 
+-- 
+1.7.0.4
+

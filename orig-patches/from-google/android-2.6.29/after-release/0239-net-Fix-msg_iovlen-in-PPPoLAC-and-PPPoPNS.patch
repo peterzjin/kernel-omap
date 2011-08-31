@@ -1,0 +1,63 @@
+From 1f244221f0bc358b268836a61fb423ea42c1fda6 Mon Sep 17 00:00:00 2001
+From: Chia-chi Yeh <chiachi@android.com>
+Date: Sat, 12 Dec 2009 03:14:38 +0800
+Subject: [PATCH 239/247] net: Fix msg_iovlen in PPPoLAC and PPPoPNS.
+
+Although any positive value should work (which is always true in both drivers),
+the correct value should be 1.
+
+Signed-off-by: Chia-chi Yeh <chiachi@android.com>
+---
+ drivers/net/pppolac.c |    7 +++----
+ drivers/net/pppopns.c |    7 +++----
+ 2 files changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/net/pppolac.c b/drivers/net/pppolac.c
+index 6c277ad..af3202a 100644
+--- a/drivers/net/pppolac.c
++++ b/drivers/net/pppolac.c
+@@ -137,15 +137,14 @@ static void pppolac_xmit_core(struct work_struct *delivery_work)
+ 
+ 	set_fs(KERNEL_DS);
+ 	while ((skb = skb_dequeue(&delivery_queue))) {
+-		unsigned int length = skb->len;
+ 		struct sock *sk_udp = skb->sk;
+-		struct kvec iov = {.iov_base = skb->data, .iov_len = length};
++		struct kvec iov = {.iov_base = skb->data, .iov_len = skb->len};
+ 		struct msghdr msg = {
+ 			.msg_iov = (struct iovec *)&iov,
+-			.msg_iovlen = length,
++			.msg_iovlen = 1,
+ 			.msg_flags = MSG_NOSIGNAL | MSG_DONTWAIT,
+ 		};
+-		sk_udp->sk_prot->sendmsg(NULL, sk_udp, &msg, length);
++		sk_udp->sk_prot->sendmsg(NULL, sk_udp, &msg, skb->len);
+ 		kfree_skb(skb);
+ 	}
+ 	set_fs(old_fs);
+diff --git a/drivers/net/pppopns.c b/drivers/net/pppopns.c
+index d8ca669..2980971 100644
+--- a/drivers/net/pppopns.c
++++ b/drivers/net/pppopns.c
+@@ -117,15 +117,14 @@ static void pppopns_xmit_core(struct work_struct *delivery_work)
+ 
+ 	set_fs(KERNEL_DS);
+ 	while ((skb = skb_dequeue(&delivery_queue))) {
+-		unsigned int length = skb->len;
+ 		struct sock *sk_raw = skb->sk;
+-		struct kvec iov = {.iov_base = skb->data, .iov_len = length};
++		struct kvec iov = {.iov_base = skb->data, .iov_len = skb->len};
+ 		struct msghdr msg = {
+ 			.msg_iov = (struct iovec *)&iov,
+-			.msg_iovlen = length,
++			.msg_iovlen = 1,
+ 			.msg_flags = MSG_NOSIGNAL | MSG_DONTWAIT,
+ 		};
+-		sk_raw->sk_prot->sendmsg(NULL, sk_raw, &msg, length);
++		sk_raw->sk_prot->sendmsg(NULL, sk_raw, &msg, skb->len);
+ 		kfree_skb(skb);
+ 	}
+ 	set_fs(old_fs);
+-- 
+1.7.0.4
+

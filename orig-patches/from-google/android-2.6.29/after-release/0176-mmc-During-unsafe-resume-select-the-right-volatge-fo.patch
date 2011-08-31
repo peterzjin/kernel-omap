@@ -1,0 +1,32 @@
+From 6010804968cb4aa951e0ddca3e198c40fc13db15 Mon Sep 17 00:00:00 2001
+From: Balaji Rao <balajirrao@openmoko.org>
+Date: Wed, 25 Feb 2009 15:28:09 +0530
+Subject: [PATCH 176/247] mmc: During unsafe resume, select the right volatge for the card
+
+During mmc unsafe resume, choose the right voltage for the card after
+powerup.
+
+Although this has not seen to cause trouble, it's the wrong behaviour.
+
+Signed-off-by: Balaji Rao <balajirrao@openmoko.org>
+Signed-off-by: Pierre Ossman <drzeus@drzeus.cx>
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/mmc/core/core.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 3ca9eed..eda54c4 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -928,6 +928,7 @@ int mmc_resume_host(struct mmc_host *host)
+ 
+ 	if (host->bus_ops && !host->bus_dead) {
+ 		mmc_power_up(host);
++		mmc_select_voltage(host, host->ocr);
+ 		BUG_ON(!host->bus_ops->resume);
+ 		host->bus_ops->resume(host);
+ 	}
+-- 
+1.7.0.4
+

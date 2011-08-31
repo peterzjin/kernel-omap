@@ -1,0 +1,60 @@
+From ad072b05cd923a66ddab5277e8961a51c2f312dc Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Mon, 16 Feb 2009 03:20:31 +0100
+Subject: [PATCH 033/247] Bluetooth: Disallow usage of L2CAP CID setting for now
+
+In the future the L2CAP layer will have full support for fixed channels
+and right now it already can export the channel assignment, but for the
+functions bind() and connect() the usage of only CID 0 is allowed. This
+allows an easy detection if the kernel supports fixed channels or not,
+because otherwise it would impossible for application to tell.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/l2cap.c |   16 ++++++++++------
+ 1 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/net/bluetooth/l2cap.c b/net/bluetooth/l2cap.c
+index 79a4325..7c6768c 100644
+--- a/net/bluetooth/l2cap.c
++++ b/net/bluetooth/l2cap.c
+@@ -799,6 +799,9 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int alen)
+ 	len = min_t(unsigned int, sizeof(la), alen);
+ 	memcpy(&la, addr, len);
+ 
++	if (la.l2_cid)
++		return -EINVAL;
++
+ 	lock_sock(sk);
+ 
+ 	if (sk->sk_state != BT_OPEN) {
+@@ -929,19 +932,20 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int al
+ 	struct sockaddr_l2 la;
+ 	int len, err = 0;
+ 
+-	lock_sock(sk);
+-
+ 	BT_DBG("sk %p", sk);
+ 
+-	if (!addr || addr->sa_family != AF_BLUETOOTH) {
+-		err = -EINVAL;
+-		goto done;
+-	}
++	if (!addr || addr->sa_family != AF_BLUETOOTH)
++		return -EINVAL;
+ 
+ 	memset(&la, 0, sizeof(la));
+ 	len = min_t(unsigned int, sizeof(la), alen);
+ 	memcpy(&la, addr, len);
+ 
++	if (la.l2_cid)
++		return -EINVAL;
++
++	lock_sock(sk);
++
+ 	if (sk->sk_type == SOCK_SEQPACKET && !la.l2_psm) {
+ 		err = -EINVAL;
+ 		goto done;
+-- 
+1.7.0.4
+

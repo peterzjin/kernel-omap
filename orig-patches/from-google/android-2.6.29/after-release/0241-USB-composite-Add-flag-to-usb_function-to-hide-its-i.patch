@@ -1,0 +1,41 @@
+From 7cb4c98245fcc081777b4f36ca23338b7240dedc Mon Sep 17 00:00:00 2001
+From: Mike Lockwood <lockwood@android.com>
+Date: Fri, 11 Dec 2009 11:24:07 -0500
+Subject: [PATCH 241/247] USB: composite: Add flag to usb_function to hide its interface during enumeration
+
+Change-Id: Ie999b5190e3e2b6fd23015b8e796cdd178829929
+
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/composite.c |    2 +-
+ include/linux/usb/composite.h  |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index 6995a10..aa3d748 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -266,7 +266,7 @@ static int config_buf(struct usb_configuration *config,
+ 			descriptors = f->hs_descriptors;
+ 		else
+ 			descriptors = f->descriptors;
+-		if (!descriptors || descriptors[0] == NULL) {
++		if (f->hidden || !descriptors || descriptors[0] == NULL) {
+ 			for (; f != config->interface[interfaceCount];) {
+ 				interfaceCount++;
+ 				c->bNumInterfaces--;
+diff --git a/include/linux/usb/composite.h b/include/linux/usb/composite.h
+index 935c380..2399007 100644
+--- a/include/linux/usb/composite.h
++++ b/include/linux/usb/composite.h
+@@ -100,6 +100,7 @@ struct usb_function {
+ 	struct usb_descriptor_header	**hs_descriptors;
+ 
+ 	struct usb_configuration	*config;
++	int				hidden;
+ 
+ 	/* REVISIT:  bind() functions can be marked __init, which
+ 	 * makes trouble for section mismatch analysis.  See if
+-- 
+1.7.0.4
+

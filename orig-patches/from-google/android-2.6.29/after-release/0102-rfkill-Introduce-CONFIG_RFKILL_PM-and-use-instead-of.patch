@@ -1,0 +1,45 @@
+From 38273a9c6de42205899712ca95bdb4680c054f13 Mon Sep 17 00:00:00 2001
+From: Nick Pelly <npelly@google.com>
+Date: Thu, 4 Dec 2008 17:37:05 -0800
+Subject: [PATCH 102/247] rfkill: Introduce CONFIG_RFKILL_PM and use instead of CONFIG_PM to power down
+
+Some platforms do not want to power down rfkill devices on suspend.
+
+Signed-off-by: Nick Pelly <npelly@google.com>
+---
+ net/rfkill/Kconfig  |    5 +++++
+ net/rfkill/rfkill.c |    2 +-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/net/rfkill/Kconfig b/net/rfkill/Kconfig
+index 7f807b3..4b31004 100644
+--- a/net/rfkill/Kconfig
++++ b/net/rfkill/Kconfig
+@@ -10,6 +10,11 @@ menuconfig RFKILL
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called rfkill.
+ 
++config RFKILL_PM
++	bool "Power off on suspend"
++	depends on RFKILL && PM
++	default y
++
+ config RFKILL_INPUT
+ 	tristate "Input layer to RF switch connector"
+ 	depends on RFKILL && INPUT
+diff --git a/net/rfkill/rfkill.c b/net/rfkill/rfkill.c
+index 3eaa394..849b648 100644
+--- a/net/rfkill/rfkill.c
++++ b/net/rfkill/rfkill.c
+@@ -512,7 +512,7 @@ static void rfkill_release(struct device *dev)
+ 	module_put(THIS_MODULE);
+ }
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_RFKILL_PM
+ static int rfkill_suspend(struct device *dev, pm_message_t state)
+ {
+ 	struct rfkill *rfkill = to_rfkill(dev);
+-- 
+1.7.0.4
+

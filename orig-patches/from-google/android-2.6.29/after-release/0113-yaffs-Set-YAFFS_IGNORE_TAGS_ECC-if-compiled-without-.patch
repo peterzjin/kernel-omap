@@ -1,0 +1,26 @@
+From ae35fb6e944ab864044fdaf99031429693fe6bb2 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Fri, 17 Oct 2008 21:06:15 -0700
+Subject: [PATCH 113/247] yaffs: Set YAFFS_IGNORE_TAGS_ECC if compiled without ECC support.
+
+---
+ fs/yaffs2/yaffs_packedtags2.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/fs/yaffs2/yaffs_packedtags2.c b/fs/yaffs2/yaffs_packedtags2.c
+index a78c03c..62efec0 100644
+--- a/fs/yaffs2/yaffs_packedtags2.c
++++ b/fs/yaffs2/yaffs_packedtags2.c
+@@ -37,6 +37,9 @@
+ #define EXTRA_OBJECT_TYPE_SHIFT (28)
+ #define EXTRA_OBJECT_TYPE_MASK  ((0x0F) << EXTRA_OBJECT_TYPE_SHIFT)
+ 
++#ifndef CONFIG_YAFFS_DOES_ECC
++#define YAFFS_IGNORE_TAGS_ECC 1
++#endif
+ 
+ static void yaffs_DumpPackedTags2TagsPart(const yaffs_PackedTags2TagsPart *ptt)
+ {
+-- 
+1.7.0.4
+

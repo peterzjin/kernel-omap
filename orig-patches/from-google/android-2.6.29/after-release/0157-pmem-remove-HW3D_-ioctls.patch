@@ -1,0 +1,30 @@
+From ff08af1d4a7ce2168516d66b17ff698ad59a95c4 Mon Sep 17 00:00:00 2001
+From: Dima Zavin <dima@android.com>
+Date: Thu, 9 Jul 2009 16:37:39 -0700
+Subject: [PATCH 157/247] pmem: remove HW3D_* ioctls
+
+Signed-off-by: Dima Zavin <dima@android.com>
+---
+ include/linux/android_pmem.h |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
+
+diff --git a/include/linux/android_pmem.h b/include/linux/android_pmem.h
+index d845483..bba03fc 100644
+--- a/include/linux/android_pmem.h
++++ b/include/linux/android_pmem.h
+@@ -33,12 +33,6 @@
+  * struct (with offset set to 0). 
+  */
+ #define PMEM_GET_TOTAL_SIZE	_IOW(PMEM_IOCTL_MAGIC, 7, unsigned int)
+-/* Revokes gpu registers and resets the gpu.  Pass a pointer to the
+- * start of the mapped gpu regs (the vaddr returned by mmap) as the argument.
+- */
+-#define HW3D_REVOKE_GPU		_IOW(PMEM_IOCTL_MAGIC, 8, unsigned int)
+-#define HW3D_GRANT_GPU		_IOW(PMEM_IOCTL_MAGIC, 9, unsigned int)
+-#define HW3D_WAIT_FOR_INTERRUPT	_IOW(PMEM_IOCTL_MAGIC, 10, unsigned int)
+ 
+ int get_pmem_file(int fd, unsigned long *start, unsigned long *vstart,
+ 		  unsigned long *end, struct file **filp);
+-- 
+1.7.0.4
+

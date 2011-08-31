@@ -1,0 +1,38 @@
+From 2210a25db06a12af247d071bfd4eec1727b86302 Mon Sep 17 00:00:00 2001
+From: Dima Zavin <dima@android.com>
+Date: Thu, 20 Aug 2009 13:21:24 -0700
+Subject: [PATCH 187/247] net: ipv4: Fix a spinlock recursion bug in tcp_v4_nuke.
+
+We can't hold the lock while calling to tcp_done(), so we drop
+it before calling. We then have to start at the top of the chain again.
+
+Signed-off-by: Dima Zavin <dima@android.com>
+---
+ net/ipv4/tcp_ipv4.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/net/ipv4/tcp_ipv4.c b/net/ipv4/tcp_ipv4.c
+index 7c05a50..b04e5ad 100644
+--- a/net/ipv4/tcp_ipv4.c
++++ b/net/ipv4/tcp_ipv4.c
+@@ -1865,6 +1865,7 @@ void tcp_v4_nuke_addr(__u32 saddr)
+ 		struct sock *sk;
+ 		spinlock_t *lock = inet_ehash_lockp(&tcp_hashinfo, bucket);
+ 
++restart:
+ 		spin_lock_bh(lock);
+ 		sk_nulls_for_each(sk, node, &tcp_hashinfo.ehash[bucket].chain) {
+ 			struct inet_sock *inet = inet_sk(sk);
+@@ -1878,7 +1879,9 @@ void tcp_v4_nuke_addr(__u32 saddr)
+ 
+ 			sk->sk_err = ETIMEDOUT;
+ 			sk->sk_error_report(sk);
++			spin_unlock_bh(lock);
+ 			tcp_done(sk);
++			goto restart;
+ 		}
+ 		spin_unlock_bh(lock);
+ 	}
+-- 
+1.7.0.4
+

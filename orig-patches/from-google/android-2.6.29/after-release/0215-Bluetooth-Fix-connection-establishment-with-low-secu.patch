@@ -1,0 +1,51 @@
+From bb0e39d99c09a903706c10b2666502f5784b6bd3 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Tue, 28 Apr 2009 09:04:55 -0700
+Subject: [PATCH 215/247] Bluetooth: Fix connection establishment with low security requirement
+
+The Bluetooth 2.1 specification introduced four different security modes
+that can be mapped using Legacy Pairing and Simple Pairing. With the
+usage of Simple Pairing it is required that all connections (except
+the ones for SDP) are encrypted. So even the low security requirement
+mandates an encrypted connection when using Simple Pairing. When using
+Legacy Pairing (for Bluetooth 2.0 devices and older) this is not required
+since it causes interoperability issues.
+
+To support this properly the low security requirement translates into
+different host controller transactions depending if Simple Pairing is
+supported or not. However in case of Simple Pairing the command to
+switch on encryption after a successful authentication is not triggered
+for the low security mode. This patch fixes this and actually makes
+the logic to differentiate between Simple Pairing and Legacy Pairing
+a lot simpler.
+
+Based on a report by Ville Tervo <ville.tervo@nokia.com>
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/hci_conn.c |    9 +++------
+ 1 files changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/net/bluetooth/hci_conn.c b/net/bluetooth/hci_conn.c
+index 1181db0..93517ea 100644
+--- a/net/bluetooth/hci_conn.c
++++ b/net/bluetooth/hci_conn.c
+@@ -424,12 +424,9 @@ int hci_conn_security(struct hci_conn *conn, __u8 sec_level, __u8 auth_type)
+ 	if (sec_level == BT_SECURITY_SDP)
+ 		return 1;
+ 
+-	if (sec_level == BT_SECURITY_LOW) {
+-		if (conn->ssp_mode > 0 && conn->hdev->ssp_mode > 0)
+-			return hci_conn_auth(conn, sec_level, auth_type);
+-		else
+-			return 1;
+-	}
++	if (sec_level == BT_SECURITY_LOW &&
++				(!conn->ssp_mode || !conn->hdev->ssp_mode))
++		return 1;
+ 
+ 	if (conn->link_mode & HCI_LM_ENCRYPT)
+ 		return hci_conn_auth(conn, sec_level, auth_type);
+-- 
+1.7.0.4
+

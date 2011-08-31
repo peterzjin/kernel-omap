@@ -1,0 +1,28 @@
+From cd69b5ec36018d988aeba3d919747a2b93111738 Mon Sep 17 00:00:00 2001
+From: San Mehat <san@google.com>
+Date: Thu, 17 Sep 2009 14:18:20 -0700
+Subject: [PATCH 203/247] Revert "ramconsole: Disable console capture upon receiving a magic sequence"
+ This reverts commit 70416fa2dd0095639fd9213b6d923ad442d87ec9.
+
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/staging/android/ram_console.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/staging/android/ram_console.c b/drivers/staging/android/ram_console.c
+index 4852503..3375c1c 100644
+--- a/drivers/staging/android/ram_console.c
++++ b/drivers/staging/android/ram_console.c
+@@ -137,9 +137,6 @@ ram_console_write(struct console *console, const char *s, unsigned int count)
+ 	if (buffer->size < ram_console_buffer_size)
+ 		buffer->size += count;
+ 	ram_console_update_header();
+-	if (!strncmp(s, "!@#$ RAMCONSOLE_DISABLE $#@!", 28)) {
+-		console->flags &= ~CON_ENABLED;
+-	}
+ }
+ 
+ static struct console ram_console = {
+-- 
+1.7.0.4
+

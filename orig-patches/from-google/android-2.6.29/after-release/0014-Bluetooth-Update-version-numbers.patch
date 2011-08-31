@@ -1,0 +1,61 @@
+From 9ac81ff08575cb15e46923038d394521ab0575be Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Fri, 16 Jan 2009 10:09:50 +0100
+Subject: [PATCH 014/247] Bluetooth: Update version numbers
+
+With the support for the enhanced security model and the support for
+deferring connection setup, it is a good idea to increase various
+version numbers.
+
+This is purely cosmetic and has no effect on the behavior, but can
+be really helpful when debugging problems in different kernel versions.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/af_bluetooth.c |    2 +-
+ net/bluetooth/l2cap.c        |    2 +-
+ net/bluetooth/rfcomm/core.c  |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/net/bluetooth/af_bluetooth.c b/net/bluetooth/af_bluetooth.c
+index 7c0031f..0d1b94d 100644
+--- a/net/bluetooth/af_bluetooth.c
++++ b/net/bluetooth/af_bluetooth.c
+@@ -41,7 +41,7 @@
+ 
+ #include <net/bluetooth/bluetooth.h>
+ 
+-#define VERSION "2.14"
++#define VERSION "2.15"
+ 
+ /* Bluetooth sockets */
+ #define BT_MAX_PROTO	8
+diff --git a/net/bluetooth/l2cap.c b/net/bluetooth/l2cap.c
+index 82a9e69..71a064f 100644
+--- a/net/bluetooth/l2cap.c
++++ b/net/bluetooth/l2cap.c
+@@ -50,7 +50,7 @@
+ #include <net/bluetooth/hci_core.h>
+ #include <net/bluetooth/l2cap.h>
+ 
+-#define VERSION "2.11"
++#define VERSION "2.12"
+ 
+ static u32 l2cap_feat_mask = 0x0000;
+ 
+diff --git a/net/bluetooth/rfcomm/core.c b/net/bluetooth/rfcomm/core.c
+index dafaee9..ad0e25a 100644
+--- a/net/bluetooth/rfcomm/core.c
++++ b/net/bluetooth/rfcomm/core.c
+@@ -46,7 +46,7 @@
+ #include <net/bluetooth/l2cap.h>
+ #include <net/bluetooth/rfcomm.h>
+ 
+-#define VERSION "1.10"
++#define VERSION "1.11"
+ 
+ static int disable_cfc = 0;
+ static int channel_mtu = -1;
+-- 
+1.7.0.4
+

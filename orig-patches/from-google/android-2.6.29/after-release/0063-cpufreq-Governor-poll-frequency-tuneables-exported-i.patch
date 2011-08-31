@@ -1,0 +1,89 @@
+From 0d75cd22f9c28efffa0d8b8d3485c6466ef925d9 Mon Sep 17 00:00:00 2001
+From: Mike Chan <mike@android.com>
+Date: Tue, 10 Feb 2009 17:24:37 -0800
+Subject: [PATCH 063/247] cpufreq: Governor poll frequency tuneables exported in config.
+
+Signed-off-by: Mike Chan <mike@android.com>
+---
+ drivers/cpufreq/Kconfig                |   13 +++++++++++++
+ drivers/cpufreq/cpufreq_conservative.c |    5 ++---
+ drivers/cpufreq/cpufreq_ondemand.c     |    5 ++---
+ 3 files changed, 17 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index a8c8d9c..335f28b 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -190,4 +190,17 @@ config CPU_FREQ_GOV_CONSERVATIVE
+ 
+ 	  If in doubt, say N.
+ 
++config CPU_FREQ_MIN_TICKS
++	int "Ticks between governor polling interval."
++	default 10
++	help
++	  Minimum number of ticks between polling interval for governors.
++
++config CPU_FREQ_SAMPLING_LATENCY_MULTIPLIER
++	int "Sampling rate multiplier for governors."
++	default 1000
++	help
++	  Sampling latency rate multiplied by the cpu switch latency.
++	  Affects governor polling.
++
+ endif	# CPU_FREQ
+diff --git a/drivers/cpufreq/cpufreq_conservative.c b/drivers/cpufreq/cpufreq_conservative.c
+index 0320962..cbfc99d 100644
+--- a/drivers/cpufreq/cpufreq_conservative.c
++++ b/drivers/cpufreq/cpufreq_conservative.c
+@@ -51,11 +51,10 @@ static unsigned int def_sampling_rate;
+ #define MIN_SAMPLING_RATE_RATIO			(2)
+ /* for correct statistics, we need at least 10 ticks between each measure */
+ #define MIN_STAT_SAMPLING_RATE			\
+-			(MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10))
++	(MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(CONFIG_CPU_FREQ_MIN_TICKS))
+ #define MIN_SAMPLING_RATE			\
+ 			(def_sampling_rate / MIN_SAMPLING_RATE_RATIO)
+ #define MAX_SAMPLING_RATE			(500 * def_sampling_rate)
+-#define DEF_SAMPLING_RATE_LATENCY_MULTIPLIER	(1000)
+ #define DEF_SAMPLING_DOWN_FACTOR		(1)
+ #define MAX_SAMPLING_DOWN_FACTOR		(10)
+ #define TRANSITION_LATENCY_LIMIT		(10 * 1000 * 1000)
+@@ -524,7 +523,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
+ 				latency = 1;
+ 
+ 			def_sampling_rate = 10 * latency *
+-					DEF_SAMPLING_RATE_LATENCY_MULTIPLIER;
++				CONFIG_CPU_FREQ_SAMPLING_LATENCY_MULTIPLIER;
+ 
+ 			if (def_sampling_rate < MIN_STAT_SAMPLING_RATE)
+ 				def_sampling_rate = MIN_STAT_SAMPLING_RATE;
+diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
+index 6f45b16..6c80533 100644
+--- a/drivers/cpufreq/cpufreq_ondemand.c
++++ b/drivers/cpufreq/cpufreq_ondemand.c
+@@ -48,11 +48,10 @@ static unsigned int def_sampling_rate;
+ #define MIN_SAMPLING_RATE_RATIO			(2)
+ /* for correct statistics, we need at least 10 ticks between each measure */
+ #define MIN_STAT_SAMPLING_RATE 			\
+-			(MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10))
++	(MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(CONFIG_CPU_FREQ_MIN_TICKS))
+ #define MIN_SAMPLING_RATE			\
+ 			(def_sampling_rate / MIN_SAMPLING_RATE_RATIO)
+ #define MAX_SAMPLING_RATE			(500 * def_sampling_rate)
+-#define DEF_SAMPLING_RATE_LATENCY_MULTIPLIER	(1000)
+ #define TRANSITION_LATENCY_LIMIT		(10 * 1000 * 1000)
+ 
+ static void do_dbs_timer(struct work_struct *work);
+@@ -592,7 +591,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
+ 				latency = 1;
+ 
+ 			def_sampling_rate = latency *
+-					DEF_SAMPLING_RATE_LATENCY_MULTIPLIER;
++				CONFIG_CPU_FREQ_SAMPLING_LATENCY_MULTIPLIER;
+ 
+ 			if (def_sampling_rate < MIN_STAT_SAMPLING_RATE)
+ 				def_sampling_rate = MIN_STAT_SAMPLING_RATE;
+-- 
+1.7.0.4
+

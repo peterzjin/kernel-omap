@@ -1,0 +1,38 @@
+From 0de35cf7b88cf59b523d0bdab96af436dcf59b00 Mon Sep 17 00:00:00 2001
+From: Mike Chan <mike@android.com>
+Date: Tue, 27 Oct 2009 17:37:44 -0700
+Subject: [PATCH 231/247] input: evdev: Use unique wakelock names
+
+wakelock names are now contain evdev->name and pid
+
+Signed-off-by: Mike Chan <mike@android.com>
+---
+ drivers/input/evdev.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/input/evdev.c b/drivers/input/evdev.c
+index af87135..88f3259 100644
+--- a/drivers/input/evdev.c
++++ b/drivers/input/evdev.c
+@@ -45,6 +45,7 @@ struct evdev_client {
+ 	struct evdev *evdev;
+ 	struct list_head node;
+ 	struct wake_lock wake_lock;
++	char name[28];
+ };
+ 
+ static struct evdev *evdev_table[EVDEV_MINORS];
+@@ -279,7 +280,9 @@ static int evdev_open(struct inode *inode, struct file *file)
+ 	}
+ 
+ 	spin_lock_init(&client->buffer_lock);
+-	wake_lock_init(&client->wake_lock, WAKE_LOCK_SUSPEND, "evdev");
++	snprintf(client->name, sizeof(client->name), "%s-%d", evdev->name,
++			task_tgid_vnr(current));
++	wake_lock_init(&client->wake_lock, WAKE_LOCK_SUSPEND, client->name);
+ 	client->evdev = evdev;
+ 	evdev_attach_client(evdev, client);
+ 
+-- 
+1.7.0.4
+

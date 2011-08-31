@@ -1,0 +1,31 @@
+From 5ff986002d8e5a61fdf8ba1127d726946b9d0677 Mon Sep 17 00:00:00 2001
+From: Jocelyn Falempe <jocelyn.falempe@motorola.com>
+Date: Tue, 22 Sep 2009 14:27:24 +0200
+Subject: [PATCH 217/247] cpufreq: ondemand: Don't synchronize sample rate unless mulitple cpus present
+
+For UP systems this is not required, and results in a more consistent
+sample interval.
+
+Signed-off-by: Jocelyn Falempe <jocelyn.falempe@motorola.com>
+Signed-off-by: Mike Chan <mike@android.com>
+---
+ drivers/cpufreq/cpufreq_ondemand.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_ondemand.c b/drivers/cpufreq/cpufreq_ondemand.c
+index 6c80533..2999fa7 100644
+--- a/drivers/cpufreq/cpufreq_ondemand.c
++++ b/drivers/cpufreq/cpufreq_ondemand.c
+@@ -489,7 +489,8 @@ static void do_dbs_timer(struct work_struct *work)
+ 	/* We want all CPUs to do sampling nearly on same jiffy */
+ 	int delay = usecs_to_jiffies(dbs_tuners_ins.sampling_rate);
+ 
+-	delay -= jiffies % delay;
++	if (num_online_cpus() > 1)
++		delay -= jiffies % delay;
+ 
+ 	if (lock_policy_rwsem_write(cpu) < 0)
+ 		return;
+-- 
+1.7.0.4
+

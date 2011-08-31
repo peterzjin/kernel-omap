@@ -1,0 +1,86 @@
+From 7df592fda6449de1661b48e3efaa7bd9fae7796c Mon Sep 17 00:00:00 2001
+From: Paul Gortmaker <paul.gortmaker@gmail.com>
+Date: Thu, 7 May 2009 15:18:40 +0100
+Subject: [PATCH 133/247] [ARM] 5507/1: support R_ARM_MOVW_ABS_NC and MOVT_ABS relocation types
+
+From: Bruce Ashfield <bruce.ashfield@windriver.com>
+
+To fully support the armv7-a instruction set/optimizations, support
+for the R_ARM_MOVW_ABS_NC and R_ARM_MOVT_ABS relocation types is
+required.
+
+The MOVW and MOVT are both load-immediate instructions, MOVW loads 16
+bits into the bottom half of a register, and MOVT loads 16 bits into the
+top half of a register.
+
+The relocation information for these instructions has a full 32 bit
+value, plus an addend which is stored in the 16 immediate bits in the
+instruction itself.  The immediate bits in the instruction are not
+contiguous (the register # splits it into a 4 bit and 12 bit value),
+so the addend has to be extracted accordingly and added to the value.
+The value is then split and put into the instruction; a MOVW uses the
+bottom 16 bits of the value, and a MOVT uses the top 16 bits.
+
+Signed-off-by: David Borman <david.borman@windriver.com>
+Signed-off-by: Bruce Ashfield <bruce.ashfield@windriver.com>
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/elf.h |   14 +++++++++-----
+ arch/arm/kernel/module.c   |   15 +++++++++++++++
+ 2 files changed, 24 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index 68f7e03..8196abf 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -45,11 +45,15 @@ typedef struct user_fp elf_fpregset_t;
+ #define EF_ARM_HASENTRY		0x00000002	/* All */
+ #define EF_ARM_RELEXEC		0x00000001	/* All */
+ 
+-#define R_ARM_NONE	0
+-#define R_ARM_PC24	1
+-#define R_ARM_ABS32	2
+-#define R_ARM_CALL	28
+-#define R_ARM_JUMP24	29
++#define R_ARM_NONE		0
++#define R_ARM_PC24		1
++#define R_ARM_ABS32		2
++#define R_ARM_CALL		28
++#define R_ARM_JUMP24		29
++#define R_ARM_V4BX		40
++#define R_ARM_PREL31		42
++#define R_ARM_MOVW_ABS_NC	43
++#define R_ARM_MOVT_ABS		44
+ 
+ /*
+  * These are used to set parameters in the core dumps.
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index dab48f2..2ecffb8 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -132,6 +132,21 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			*(u32 *)loc |= offset & 0x00ffffff;
+ 			break;
+ 
++		case R_ARM_MOVW_ABS_NC:
++		case R_ARM_MOVT_ABS:
++			offset = *(u32 *)loc;
++			offset = ((offset & 0xf0000) >> 4) | (offset & 0xfff);
++			offset = (offset ^ 0x8000) - 0x8000;
++
++			offset += sym->st_value;
++			if (ELF32_R_TYPE(rel->r_info) == R_ARM_MOVT_ABS)
++				offset >>= 16;
++
++			*(u32 *)loc &= 0xfff0f000;
++			*(u32 *)loc |= ((offset & 0xf000) << 4) |
++					(offset & 0x0fff);
++			break;
++
+ 		default:
+ 			printk(KERN_ERR "%s: unknown relocation: %u\n",
+ 			       module->name, ELF32_R_TYPE(rel->r_info));
+-- 
+1.7.0.4
+

@@ -1,0 +1,176 @@
+From 4182588b2e463f7e3a1d99d0584f67828a85d310 Mon Sep 17 00:00:00 2001
+From: San Mehat <san@google.com>
+Date: Thu, 13 Aug 2009 11:23:37 -0700
+Subject: [PATCH 179/247] mmc: mmc_rescan detects card change in one run
+
+With this patch, mmc_rescan can detect the removal of an mmc card and
+the insertion of (possibly another) card in the same run. This means
+that a card change can be detected without having to call
+mmc_detect_change multiple times.
+
+This change generalises the core such that it can be easily used by
+hosts which provide a mechanism to detect only the presence of a card
+reader cover, which has to be taken off in order to insert a card. Other
+hosts ("card detect" or "MMC_CAP_NEEDS_POLL") each receive an event when
+a card is removed and when a card is inserted, so it is sufficient for
+them if mmc_rescan handles only one event at a time. "Cover detect"
+hosts, however, only receive events about the cover status. This means
+that between 2 subsequent events, both a card removal and a card
+insertion can occur. In this case, the pre-patch version of mmc_rescan
+would only detect the removal of the previous card but not the insertion
+of the new card.
+
+Signed-off-by: Jorg Schummer <ext-jorg.2.schummer@nokia.com>
+Signed-off-by: Pierre Ossman <pierre@ossman.eu>
+Signed-off-by: San Mehat <san@android.com>
+
+Conflicts:
+
+	drivers/mmc/core/core.c
+
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/mmc/core/core.c |  116 +++++++++++++++++++++++++---------------------
+ 1 files changed, 63 insertions(+), 53 deletions(-)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 034d615..c0426fd 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -768,70 +768,80 @@ void mmc_rescan(struct work_struct *work)
+ 
+ 	mmc_bus_get(host);
+ 
+-	if (host->bus_ops == NULL) {
+-		/*
+-		 * Only we can add a new handler, so it's safe to
+-		 * release the lock here.
+-		 */
+-		mmc_bus_put(host);
++	/* if there is a card registered, check whether it is still present */
++	if ((host->bus_ops != NULL) &&
++            host->bus_ops->detect && !host->bus_dead) {
++		host->bus_ops->detect(host);
++		/* If the card was removed the bus will be marked
++		 * as dead - extend the wakelock so userspace
++		 * can respond */
++		if (host->bus_dead)
++			extend_wakelock = 1;
++	}
+ 
+-		if (host->ops->get_cd && host->ops->get_cd(host) == 0)
+-			goto out;
++	mmc_bus_put(host);
+ 
+-		mmc_claim_host(host);
+ 
+-		mmc_power_up(host);
+-		mmc_go_idle(host);
++	mmc_bus_get(host);
+ 
+-		mmc_send_if_cond(host, host->ocr_avail);
++	/* if there still is a card present, stop here */
++	if (host->bus_ops != NULL) {
++		mmc_bus_put(host);
++		goto out;
++	}
+ 
+-		/*
+-		 * First we search for SDIO...
+-		 */
+-		err = mmc_send_io_op_cond(host, 0, &ocr);
+-		if (!err) {
+-			if (mmc_attach_sdio(host, ocr))
+-				mmc_power_off(host);
+-			extend_wakelock = 1;
+-			goto out;
+-		}
++	/* detect a newly inserted card */
+ 
+-		/*
+-		 * ...then normal SD...
+-		 */
+-		err = mmc_send_app_op_cond(host, 0, &ocr);
+-		if (!err) {
+-			if (mmc_attach_sd(host, ocr))
+-				mmc_power_off(host);
+-			extend_wakelock = 1;
+-			goto out;
+-		}
++	/*
++	 * Only we can add a new handler, so it's safe to
++	 * release the lock here.
++	 */
++	mmc_bus_put(host);
+ 
+-		/*
+-		 * ...and finally MMC.
+-		 */
+-		err = mmc_send_op_cond(host, 0, &ocr);
+-		if (!err) {
+-			if (mmc_attach_mmc(host, ocr))
+-				mmc_power_off(host);
+-			extend_wakelock = 1;
+-			goto out;
+-		}
++	if (host->ops->get_cd && host->ops->get_cd(host) == 0)
++		goto out;
+ 
+-		mmc_release_host(host);
+-		mmc_power_off(host);
+-	} else {
+-		if (host->bus_ops->detect && !host->bus_dead)
+-			host->bus_ops->detect(host);
++	mmc_claim_host(host);
++	mmc_power_up(host);
++	mmc_go_idle(host);
++	mmc_send_if_cond(host, host->ocr_avail);
+ 
+-		/* If the card was removed the bus will be marked
+-		 * as dead - extend the wakelock so userspace
+-		 * can respond */
+-		if (host->bus_dead)
+-			extend_wakelock = 1;
++	/*
++	 * First we search for SDIO...
++	 */
++	err = mmc_send_io_op_cond(host, 0, &ocr);
++	if (!err) {
++		if (mmc_attach_sdio(host, ocr))
++			mmc_power_off(host);
++		extend_wakelock = 1;
++		goto out;
++	}
+ 
+-		mmc_bus_put(host);
++	/*
++	 * ...then normal SD...
++	 */
++	err = mmc_send_app_op_cond(host, 0, &ocr);
++	if (!err) {
++		if (mmc_attach_sd(host, ocr))
++			mmc_power_off(host);
++		extend_wakelock = 1;
++		goto out;
++	}
++
++	/*
++	 * ...and finally MMC.
++	 */
++	err = mmc_send_op_cond(host, 0, &ocr);
++	if (!err) {
++		if (mmc_attach_mmc(host, ocr))
++			mmc_power_off(host);
++		extend_wakelock = 1;
++		goto out;
+ 	}
++
++	mmc_release_host(host);
++	mmc_power_off(host);
++
+ out:
+ 	if (extend_wakelock)
+ 		wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
+-- 
+1.7.0.4
+

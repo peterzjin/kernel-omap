@@ -1,0 +1,40 @@
+From db83a334959994d2a617812b8b536d18fa072ce2 Mon Sep 17 00:00:00 2001
+From: San Mehat <san@google.com>
+Date: Wed, 29 Jul 2009 20:21:28 -0700
+Subject: [PATCH 155/247] serial_core: Add wake_peer uart operation which is called before starting UART TX. The idea here is to provide a mechanism where we can wakeup our peer before sending data.
+
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/serial/serial_core.c |    3 +++
+ include/linux/serial_core.h  |    1 +
+ 2 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/serial/serial_core.c b/drivers/serial/serial_core.c
+index 42f4e66..4632059 100644
+--- a/drivers/serial/serial_core.c
++++ b/drivers/serial/serial_core.c
+@@ -94,6 +94,9 @@ static void __uart_start(struct tty_struct *tty)
+ 	struct uart_state *state = tty->driver_data;
+ 	struct uart_port *port = state->port;
+ 
++	if (port->ops->wake_peer)
++		port->ops->wake_peer(port);
++
+ 	if (!uart_circ_empty(&state->info.xmit) && state->info.xmit.buf &&
+ 	    !tty->stopped && !tty->hw_stopped)
+ 		port->ops->start_tx(port);
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index df9245c..f945a25 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -203,6 +203,7 @@ struct uart_ops {
+ 	void		(*pm)(struct uart_port *, unsigned int state,
+ 			      unsigned int oldstate);
+ 	int		(*set_wake)(struct uart_port *, unsigned int state);
++	void		(*wake_peer)(struct uart_port *);
+ 
+ 	/*
+ 	 * Return a string describing the type of the port
+-- 
+1.7.0.4
+

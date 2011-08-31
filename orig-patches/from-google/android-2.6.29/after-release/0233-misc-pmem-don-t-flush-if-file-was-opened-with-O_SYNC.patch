@@ -1,0 +1,27 @@
+From d9fd94906d0af05be96dfa544e520ff10ca88e0c Mon Sep 17 00:00:00 2001
+From: Dima Zavin <dima@android.com>
+Date: Sun, 1 Nov 2009 19:58:15 -0800
+Subject: [PATCH 233/247] misc: pmem: don't flush if file was opened with O_SYNC
+
+Change-Id: I067218658a0d7f7ecc1fe73e9ff6b0c3b3054653
+Signed-off-by: Dima Zavin <dima@android.com>
+---
+ drivers/misc/pmem.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/misc/pmem.c b/drivers/misc/pmem.c
+index ec7db34..55c4de8 100644
+--- a/drivers/misc/pmem.c
++++ b/drivers/misc/pmem.c
+@@ -795,7 +795,7 @@ void flush_pmem_file(struct file *file, unsigned long offset, unsigned long len)
+ 
+ 	id = get_id(file);
+ 	data = (struct pmem_data *)file->private_data;
+-	if (!pmem[id].cached)
++	if (!pmem[id].cached || file->f_flags & O_SYNC)
+ 		return;
+ 
+ 	down_read(&data->sem);
+-- 
+1.7.0.4
+

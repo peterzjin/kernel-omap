@@ -1,0 +1,32 @@
+From f1e654d503322cff19154658d2bce0901aceda05 Mon Sep 17 00:00:00 2001
+From: Krishna, Vamsi <vskrishn@qualcomm.com>
+Date: Wed, 11 Feb 2009 21:07:20 +0530
+Subject: [PATCH 243/247] USB: android gadget: add remote wakeup attribute to android function
+
+Add remote wakeup attribute to configuration descriptor of android
+function to advertise remote wakeup capability to host
+
+Acked-by: Allam, Suresh Reddy <sallam@qualcomm.com>
+
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/android.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/usb/gadget/android.c b/drivers/usb/gadget/android.c
+index d3c028d..e3499ec 100644
+--- a/drivers/usb/gadget/android.c
++++ b/drivers/usb/gadget/android.c
+@@ -173,6 +173,9 @@ static int __init android_bind(struct usb_composite_dev *cdev)
+ 	strings_dev[STRING_SERIAL_IDX].id = id;
+ 	device_desc.iSerialNumber = id;
+ 
++	if (gadget->ops->wakeup)
++		android_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
++
+ 	/* register our configuration */
+ 	ret = usb_add_config(cdev, &android_config_driver);
+ 	if (ret) {
+-- 
+1.7.0.4
+

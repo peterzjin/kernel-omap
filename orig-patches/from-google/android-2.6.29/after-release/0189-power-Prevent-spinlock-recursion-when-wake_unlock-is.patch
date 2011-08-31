@@ -1,0 +1,51 @@
+From 89b411511bb1cdfd8f8f8bc4eb5b92f5e1a14caf Mon Sep 17 00:00:00 2001
+From: Mike Chan <mike@android.com>
+Date: Tue, 25 Aug 2009 18:10:32 -0700
+Subject: [PATCH 189/247] power: Prevent spinlock recursion when wake_unlock() is called
+
+Signed-off-by: Mike Chan <mike@android.com>
+---
+ kernel/power/wakelock.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/kernel/power/wakelock.c b/kernel/power/wakelock.c
+index 7833d28..81c91af 100644
+--- a/kernel/power/wakelock.c
++++ b/kernel/power/wakelock.c
+@@ -216,13 +216,13 @@ static void expire_wake_lock(struct wake_lock *lock)
+ 		pr_info("expired wake lock %s\n", lock->name);
+ }
+ 
++/* Caller must acquire the list_lock spinlock */
+ static void print_active_locks(int type)
+ {
+ 	unsigned long irqflags;
+ 	struct wake_lock *lock;
+ 
+ 	BUG_ON(type >= WAKE_LOCK_TYPE_COUNT);
+-	spin_lock_irqsave(&list_lock, irqflags);
+ 	list_for_each_entry(lock, &active_wake_locks[type], link) {
+ 		if (lock->flags & WAKE_LOCK_AUTO_EXPIRE) {
+ 			long timeout = lock->expires - jiffies;
+@@ -234,7 +234,6 @@ static void print_active_locks(int type)
+ 		} else
+ 			pr_info("active wake lock %s\n", lock->name);
+ 	}
+-	spin_unlock_irqrestore(&list_lock, irqflags);
+ }
+ 
+ static long has_wake_lock_locked(int type)
+@@ -306,9 +305,9 @@ static void expire_wake_locks(unsigned long data)
+ 	unsigned long irqflags;
+ 	if (debug_mask & DEBUG_EXPIRE)
+ 		pr_info("expire_wake_locks: start\n");
++	spin_lock_irqsave(&list_lock, irqflags);
+ 	if (debug_mask & DEBUG_SUSPEND)
+ 		print_active_locks(WAKE_LOCK_SUSPEND);
+-	spin_lock_irqsave(&list_lock, irqflags);
+ 	has_lock = has_wake_lock_locked(WAKE_LOCK_SUSPEND);
+ 	if (debug_mask & DEBUG_EXPIRE)
+ 		pr_info("expire_wake_locks: done, has_lock %ld\n", has_lock);
+-- 
+1.7.0.4
+

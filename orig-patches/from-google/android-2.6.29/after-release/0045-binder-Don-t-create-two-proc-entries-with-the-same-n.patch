@@ -1,0 +1,28 @@
+From 41d5cc514991e0e1f42c3e2c878f7edc91b8e775 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Mon, 30 Mar 2009 20:43:29 -0700
+Subject: [PATCH 045/247] binder: Don't create two proc entries with the same name if the driver is opened twice in one process.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+---
+ drivers/staging/android/binder.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/staging/android/binder.c b/drivers/staging/android/binder.c
+index b62cd2a..39871da 100644
+--- a/drivers/staging/android/binder.c
++++ b/drivers/staging/android/binder.c
+@@ -2776,6 +2776,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
+ 	if (binder_proc_dir_entry_proc) {
+ 		char strbuf[11];
+ 		snprintf(strbuf, sizeof(strbuf), "%u", proc->pid);
++		remove_proc_entry(strbuf, binder_proc_dir_entry_proc);
+ 		create_proc_read_entry(strbuf, S_IRUGO, binder_proc_dir_entry_proc, binder_read_proc_proc, proc);
+ 	}
+ 
+-- 
+1.7.0.4
+

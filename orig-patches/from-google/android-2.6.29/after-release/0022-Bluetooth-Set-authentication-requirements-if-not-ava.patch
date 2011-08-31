@@ -1,0 +1,35 @@
+From 0424ed0523bbda223de72d59ed4d4a9fbdcd6232 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Fri, 6 Feb 2009 19:45:36 +0100
+Subject: [PATCH 022/247] Bluetooth: Set authentication requirements if not available
+
+When no authentication requirements are selected, but an outgoing or
+incoming connection has requested any kind of security enforcement,
+then set these authentication requirements.
+
+This ensures that the userspace always gets informed about the
+authentication requirements (if available). Only when no security
+enforcement has happened, the kernel will signal invalid requirements.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/hci_conn.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/net/bluetooth/hci_conn.c b/net/bluetooth/hci_conn.c
+index 7fc4c04..dcdaa4b 100644
+--- a/net/bluetooth/hci_conn.c
++++ b/net/bluetooth/hci_conn.c
+@@ -416,6 +416,9 @@ int hci_conn_security(struct hci_conn *conn, __u8 sec_level, __u8 auth_type)
+ {
+ 	BT_DBG("conn %p", conn);
+ 
++	if (conn->auth_type == 0xff)
++		conn->auth_type = auth_type;
++
+ 	if (sec_level == BT_SECURITY_SDP)
+ 		return 1;
+ 
+-- 
+1.7.0.4
+

@@ -1,0 +1,91 @@
+From f7f6469023c8c704157f9932a7639b70936d44b6 Mon Sep 17 00:00:00 2001
+From: Chia-chi Yeh <chiachi@android.com>
+Date: Thu, 9 Jul 2009 12:49:13 +0800
+Subject: [PATCH 138/247] net: Force PPPoLAC and PPPoPNS to bind an interface before creating PPP channel.
+
+It is common to manipulate the routing table after configuring PPP device.
+Since both PPPoLAC and PPPoPNS run over IP, care must be taken to make sure
+that there is no loop in the routing table.
+Although this can be done by adding a host route, it might still cause
+problems when the interface is down for some reason.
+
+To solve this, this patch forces both drivers to bind an interface before
+creating PPP channel, so the system will not re-route the tunneling sockets
+to another interface when the original one is down. Another benefit is that
+now the host route is no longer required, so there is no need to remove it
+when PPP channel is closed.
+
+Signed-off-by: Chia-chi Yeh <chiachi@android.com>
+---
+ drivers/net/pppolac.c |    8 ++++++++
+ drivers/net/pppopns.c |   15 +++++++++++++--
+ 2 files changed, 21 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/pppolac.c b/drivers/net/pppolac.c
+index 1f52227..b4d879d 100644
+--- a/drivers/net/pppolac.c
++++ b/drivers/net/pppolac.c
+@@ -220,6 +220,14 @@ static int pppolac_connect(struct socket *sock, struct sockaddr *useraddr,
+ 	error = -EBUSY;
+ 	if (udp_sk(sk_udp)->encap_type || sk_udp->sk_user_data)
+ 		goto out;
++	if (!sk_udp->sk_bound_dev_if) {
++		struct dst_entry *dst = sk_dst_get(sk_udp);
++		error = -ENODEV;
++		if (!dst)
++			goto out;
++		sk_udp->sk_bound_dev_if = dst->dev->ifindex;
++		dst_release(dst);
++	}
+ 
+ 	po->chan.hdrlen = 12;
+ 	po->chan.private = sk_udp;
+diff --git a/drivers/net/pppopns.c b/drivers/net/pppopns.c
+index 7edff02..eae4bda 100644
+--- a/drivers/net/pppopns.c
++++ b/drivers/net/pppopns.c
+@@ -161,6 +161,7 @@ static int pppopns_connect(struct socket *sock, struct sockaddr *useraddr,
+ 	struct sockaddr_storage ss;
+ 	struct socket *sock_tcp = NULL;
+ 	struct socket *sock_raw = NULL;
++	struct sock *sk_tcp;
+ 	struct sock *sk_raw;
+ 	int error;
+ 
+@@ -175,21 +176,31 @@ static int pppopns_connect(struct socket *sock, struct sockaddr *useraddr,
+ 	sock_tcp = sockfd_lookup(addr->tcp_socket, &error);
+ 	if (!sock_tcp)
+ 		goto out;
++	sk_tcp = sock_tcp->sk;
+ 	error = -EPROTONOSUPPORT;
+-	if (sock_tcp->sk->sk_protocol != IPPROTO_TCP)
++	if (sk_tcp->sk_protocol != IPPROTO_TCP)
+ 		goto out;
+ 	addrlen = sizeof(struct sockaddr_storage);
+ 	error = kernel_getpeername(sock_tcp, (struct sockaddr *)&ss, &addrlen);
+ 	if (error)
+ 		goto out;
++	if (!sk_tcp->sk_bound_dev_if) {
++		struct dst_entry *dst = sk_dst_get(sk_tcp);
++		error = -ENODEV;
++		if (!dst)
++			goto out;
++		sk_tcp->sk_bound_dev_if = dst->dev->ifindex;
++		dst_release(dst);
++	}
+ 
+ 	error = sock_create(ss.ss_family, SOCK_RAW, IPPROTO_GRE, &sock_raw);
+ 	if (error)
+ 		goto out;
++	sk_raw = sock_raw->sk;
++	sk_raw->sk_bound_dev_if = sk_tcp->sk_bound_dev_if;
+ 	error = kernel_connect(sock_raw, (struct sockaddr *)&ss, addrlen, 0);
+ 	if (error)
+ 		goto out;
+-	sk_raw = sock_raw->sk;
+ 
+ 	po->chan.hdrlen = 14;
+ 	po->chan.private = sk_raw;
+-- 
+1.7.0.4
+

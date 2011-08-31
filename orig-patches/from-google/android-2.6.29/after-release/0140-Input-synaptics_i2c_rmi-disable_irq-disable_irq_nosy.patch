@@ -1,0 +1,40 @@
+From 75240fa23c3493988227b90edf622eddb2e125dd Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Fri, 17 Apr 2009 18:25:55 -0700
+Subject: [PATCH 140/247] Input: synaptics_i2c_rmi: disable_irq -> disable_irq_nosync
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Also remove duplicate swap macro
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+---
+ drivers/input/touchscreen/synaptics_i2c_rmi.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/input/touchscreen/synaptics_i2c_rmi.c b/drivers/input/touchscreen/synaptics_i2c_rmi.c
+index a45634b..b08c36c 100644
+--- a/drivers/input/touchscreen/synaptics_i2c_rmi.c
++++ b/drivers/input/touchscreen/synaptics_i2c_rmi.c
+@@ -24,8 +24,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/synaptics_i2c_rmi.h>
+ 
+-#define swap(x, y) do { typeof(x) z = x; x = y; y = z; } while (0)
+-
+ static struct workqueue_struct *synaptics_wq;
+ 
+ struct synaptics_ts_data {
+@@ -222,7 +220,7 @@ static irqreturn_t synaptics_ts_irq_handler(int irq, void *dev_id)
+ 	struct synaptics_ts_data *ts = dev_id;
+ 
+ 	/* printk("synaptics_ts_irq_handler\n"); */
+-	disable_irq(ts->client->irq);
++	disable_irq_nosync(ts->client->irq);
+ 	queue_work(synaptics_wq, &ts->work);
+ 	return IRQ_HANDLED;
+ }
+-- 
+1.7.0.4
+

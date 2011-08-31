@@ -1,0 +1,32 @@
+From 7eb424ce701c1ba1b4ac6b226e902bbae3cb1024 Mon Sep 17 00:00:00 2001
+From: Mike Lockwood <lockwood@android.com>
+Date: Fri, 21 Aug 2009 13:33:54 -0400
+Subject: [PATCH 185/247] drivers: usb: gadget: Add platform data struct for usb_mass_storage device
+
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ include/linux/usb/android.h |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/usb/android.h b/include/linux/usb/android.h
+index bf9dfe7..4e7f419 100644
+--- a/include/linux/usb/android.h
++++ b/include/linux/usb/android.h
+@@ -37,6 +37,14 @@ struct android_usb_platform_data {
+ 	int nluns;
+ };
+ 
++/* Platform data for "usb_mass_storage" driver.
++ * Contains values for the SC_INQUIRY SCSI command. */
++struct usb_mass_storage_platform_data {
++	char *vendor;
++	char *product;
++	int release;
++};
++
+ extern void android_usb_set_connected(int on);
+ 
+ #endif	/* __LINUX_USB_ANDROID_H */
+-- 
+1.7.0.4
+

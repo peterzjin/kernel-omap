@@ -1,0 +1,26 @@
+From 9aa7442b32bea364003d426e39361438c1f3a103 Mon Sep 17 00:00:00 2001
+From: San Mehat <san@android.com>
+Date: Sat, 21 Mar 2009 18:48:54 -0700
+Subject: [PATCH 106/247] fs: block_dump: Don't display inode changes if block_dump < 2
+
+Signed-off-by: San Mehat <san@android.com>
+---
+ fs/fs-writeback.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/fs/fs-writeback.c b/fs/fs-writeback.c
+index e3fe991..0f837d4 100644
+--- a/fs/fs-writeback.c
++++ b/fs/fs-writeback.c
+@@ -114,7 +114,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
+ 	if ((inode->i_state & flags) == flags)
+ 		return;
+ 
+-	if (unlikely(block_dump)) {
++	if (unlikely(block_dump > 1)) {
+ 		struct dentry *dentry = NULL;
+ 		const char *name = "?";
+ 
+-- 
+1.7.0.4
+

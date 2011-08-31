@@ -1,0 +1,176 @@
+From 0b9fb514a123aa85fb7823dc528e182e866717f5 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Thu, 12 Feb 2009 05:07:45 +0100
+Subject: [PATCH 027/247] Bluetooth: Add CID field to L2CAP socket address structure
+
+In preparation for L2CAP fixed channel support, the CID value of a
+L2CAP connection needs to be accessible via the socket interface. The
+CID is the connection identifier and exists as source and destination
+value. So extend the L2CAP socket address structure with this field and
+change getsockname() and getpeername() to fill it in.
+
+The bind() and connect() functions have been modified to handle L2CAP
+socket address structures of variable sizes. This makes them future
+proof if additional fields need to be added.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ include/net/bluetooth/l2cap.h |    1 +
+ net/bluetooth/l2cap.c         |   55 +++++++++++++++++++++++++---------------
+ 2 files changed, 35 insertions(+), 21 deletions(-)
+
+diff --git a/include/net/bluetooth/l2cap.h b/include/net/bluetooth/l2cap.h
+index abfec88..54737c5 100644
+--- a/include/net/bluetooth/l2cap.h
++++ b/include/net/bluetooth/l2cap.h
+@@ -37,6 +37,7 @@ struct sockaddr_l2 {
+ 	sa_family_t	l2_family;
+ 	__le16		l2_psm;
+ 	bdaddr_t	l2_bdaddr;
++	__le16		l2_cid;
+ };
+ 
+ /* L2CAP socket options */
+diff --git a/net/bluetooth/l2cap.c b/net/bluetooth/l2cap.c
+index 985366c..7bba469 100644
+--- a/net/bluetooth/l2cap.c
++++ b/net/bluetooth/l2cap.c
+@@ -770,17 +770,21 @@ static int l2cap_sock_create(struct net *net, struct socket *sock, int protocol)
+ 	return 0;
+ }
+ 
+-static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
++static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int alen)
+ {
+-	struct sockaddr_l2 *la = (struct sockaddr_l2 *) addr;
+ 	struct sock *sk = sock->sk;
+-	int err = 0;
++	struct sockaddr_l2 la;
++	int len, err = 0;
+ 
+-	BT_DBG("sk %p, %s %d", sk, batostr(&la->l2_bdaddr), la->l2_psm);
++	BT_DBG("sk %p", sk);
+ 
+ 	if (!addr || addr->sa_family != AF_BLUETOOTH)
+ 		return -EINVAL;
+ 
++	memset(&la, 0, sizeof(la));
++	len = min_t(unsigned int, sizeof(la), alen);
++	memcpy(&la, addr, len);
++
+ 	lock_sock(sk);
+ 
+ 	if (sk->sk_state != BT_OPEN) {
+@@ -788,7 +792,7 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_
+ 		goto done;
+ 	}
+ 
+-	if (la->l2_psm && btohs(la->l2_psm) < 0x1001 &&
++	if (la.l2_psm && btohs(la.l2_psm) < 0x1001 &&
+ 				!capable(CAP_NET_BIND_SERVICE)) {
+ 		err = -EACCES;
+ 		goto done;
+@@ -796,16 +800,16 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_
+ 
+ 	write_lock_bh(&l2cap_sk_list.lock);
+ 
+-	if (la->l2_psm && __l2cap_get_sock_by_addr(la->l2_psm, &la->l2_bdaddr)) {
++	if (la.l2_psm && __l2cap_get_sock_by_addr(la.l2_psm, &la.l2_bdaddr)) {
+ 		err = -EADDRINUSE;
+ 	} else {
+ 		/* Save source address */
+-		bacpy(&bt_sk(sk)->src, &la->l2_bdaddr);
+-		l2cap_pi(sk)->psm   = la->l2_psm;
+-		l2cap_pi(sk)->sport = la->l2_psm;
++		bacpy(&bt_sk(sk)->src, &la.l2_bdaddr);
++		l2cap_pi(sk)->psm   = la.l2_psm;
++		l2cap_pi(sk)->sport = la.l2_psm;
+ 		sk->sk_state = BT_BOUND;
+ 
+-		if (btohs(la->l2_psm) == 0x0001 || btohs(la->l2_psm) == 0x0003)
++		if (btohs(la.l2_psm) == 0x0001 || btohs(la.l2_psm) == 0x0003)
+ 			l2cap_pi(sk)->sec_level = BT_SECURITY_SDP;
+ 	}
+ 
+@@ -826,7 +830,8 @@ static int l2cap_do_connect(struct sock *sk)
+ 	__u8 auth_type;
+ 	int err = 0;
+ 
+-	BT_DBG("%s -> %s psm 0x%2.2x", batostr(src), batostr(dst), l2cap_pi(sk)->psm);
++	BT_DBG("%s -> %s psm 0x%2.2x", batostr(src), batostr(dst),
++							l2cap_pi(sk)->psm);
+ 
+ 	if (!(hdev = hci_get_route(dst, src)))
+ 		return -EHOSTUNREACH;
+@@ -906,20 +911,24 @@ done:
+ 
+ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int alen, int flags)
+ {
+-	struct sockaddr_l2 *la = (struct sockaddr_l2 *) addr;
+ 	struct sock *sk = sock->sk;
+-	int err = 0;
++	struct sockaddr_l2 la;
++	int len, err = 0;
+ 
+ 	lock_sock(sk);
+ 
+ 	BT_DBG("sk %p", sk);
+ 
+-	if (addr->sa_family != AF_BLUETOOTH || alen < sizeof(struct sockaddr_l2)) {
++	if (!addr || addr->sa_family != AF_BLUETOOTH) {
+ 		err = -EINVAL;
+ 		goto done;
+ 	}
+ 
+-	if (sk->sk_type == SOCK_SEQPACKET && !la->l2_psm) {
++	memset(&la, 0, sizeof(la));
++	len = min_t(unsigned int, sizeof(la), alen);
++	memcpy(&la, addr, len);
++
++	if (sk->sk_type == SOCK_SEQPACKET && !la.l2_psm) {
+ 		err = -EINVAL;
+ 		goto done;
+ 	}
+@@ -946,8 +955,8 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int al
+ 	}
+ 
+ 	/* Set destination address and psm */
+-	bacpy(&bt_sk(sk)->dst, &la->l2_bdaddr);
+-	l2cap_pi(sk)->psm = la->l2_psm;
++	bacpy(&bt_sk(sk)->dst, &la.l2_bdaddr);
++	l2cap_pi(sk)->psm = la.l2_psm;
+ 
+ 	if ((err = l2cap_do_connect(sk)))
+ 		goto done;
+@@ -1071,12 +1080,16 @@ static int l2cap_sock_getname(struct socket *sock, struct sockaddr *addr, int *l
+ 	addr->sa_family = AF_BLUETOOTH;
+ 	*len = sizeof(struct sockaddr_l2);
+ 
+-	if (peer)
++	if (peer) {
++		la->l2_psm = l2cap_pi(sk)->psm;
+ 		bacpy(&la->l2_bdaddr, &bt_sk(sk)->dst);
+-	else
++		la->l2_cid = htobs(l2cap_pi(sk)->dcid);
++	} else {
++		la->l2_psm = l2cap_pi(sk)->sport;
+ 		bacpy(&la->l2_bdaddr, &bt_sk(sk)->src);
++		la->l2_cid = htobs(l2cap_pi(sk)->scid);
++	}
+ 
+-	la->l2_psm = l2cap_pi(sk)->psm;
+ 	return 0;
+ }
+ 
+@@ -1208,7 +1221,7 @@ static int l2cap_sock_setsockopt_old(struct socket *sock, int optname, char __us
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct l2cap_options opts;
+-	int err = 0, len;
++	int len, err = 0;
+ 	u32 opt;
+ 
+ 	BT_DBG("sk %p", sk);
+-- 
+1.7.0.4
+

@@ -1,0 +1,48 @@
+From 3de11fd60d9941c720762553a9789dde578b67c9 Mon Sep 17 00:00:00 2001
+From: Marco Nelissen <marcone@android.com>
+Date: Tue, 23 Jun 2009 09:32:11 -0700
+Subject: [PATCH 135/247] ashmem: don't require a page aligned size
+
+This makes ashmem more similar to shmem and mmap, by
+not requiring the specified size to be page aligned,
+instead rounding it internally as needed.
+
+Signed-off-by: Marco Nelissen <marcone@android.com>
+---
+ mm/ashmem.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/mm/ashmem.c b/mm/ashmem.c
+index 0eef9ac..230810f 100644
+--- a/mm/ashmem.c
++++ b/mm/ashmem.c
+@@ -522,7 +522,7 @@ static int ashmem_pin_unpin(struct ashmem_area *asma, unsigned long cmd,
+ 
+ 	/* per custom, you can pass zero for len to mean "everything onward" */
+ 	if (!pin.len)
+-		pin.len = asma->size - pin.offset;
++		pin.len = PAGE_ALIGN(asma->size) - pin.offset;
+ 
+ 	if (unlikely((pin.offset | pin.len) & ~PAGE_MASK))
+ 		return -EINVAL;
+@@ -530,7 +530,7 @@ static int ashmem_pin_unpin(struct ashmem_area *asma, unsigned long cmd,
+ 	if (unlikely(((__u32) -1) - pin.offset < pin.len))
+ 		return -EINVAL;
+ 
+-	if (unlikely(asma->size < pin.offset + pin.len))
++	if (unlikely(PAGE_ALIGN(asma->size) < pin.offset + pin.len))
+ 		return -EINVAL;
+ 
+ 	pgstart = pin.offset / PAGE_SIZE;
+@@ -569,7 +569,7 @@ static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 		break;
+ 	case ASHMEM_SET_SIZE:
+ 		ret = -EINVAL;
+-		if (!asma->file && !(arg & ~PAGE_MASK)) {
++		if (!asma->file) {
+ 			ret = 0;
+ 			asma->size = (size_t) arg;
+ 		}
+-- 
+1.7.0.4
+

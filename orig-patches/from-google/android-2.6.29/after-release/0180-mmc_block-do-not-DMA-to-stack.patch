@@ -1,0 +1,64 @@
+From f472cfc5696c56ac22ddcc2baa53025d2b07742f Mon Sep 17 00:00:00 2001
+From: Ben Dooks <ben@simtec.co.uk>
+Date: Mon, 8 Jun 2009 23:33:57 +0100
+Subject: [PATCH 180/247] mmc_block: do not DMA to stack
+
+In the write recovery routine, the data to get from the card
+is allocated from the stack. The DMA mapping documentation says
+explicitly stack memory is not mappable by any of the DMA calls.
+
+Change to using kmalloc() to allocate the memory for the result
+from the card and then free it once we've finished with the
+transaction.
+
+[ Changed to GFP_KERNEL allocation - Pierre Ossman ]
+
+Signed-off-by: Ben Dooks <ben@simtec.co.uk>
+Signed-off-by: Pierre Ossman <pierre@ossman.eu>
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/mmc/card/block.c |   16 ++++++++++++----
+ 1 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 6f48a94..92e2862 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -147,7 +147,8 @@ struct mmc_blk_request {
+ static u32 mmc_sd_num_wr_blocks(struct mmc_card *card)
+ {
+ 	int err;
+-	__be32 blocks;
++	u32 result;
++	__be32 *blocks;
+ 
+ 	struct mmc_request mrq;
+ 	struct mmc_command cmd;
+@@ -199,14 +200,21 @@ static u32 mmc_sd_num_wr_blocks(struct mmc_card *card)
+ 	mrq.cmd = &cmd;
+ 	mrq.data = &data;
+ 
+-	sg_init_one(&sg, &blocks, 4);
++	blocks = kmalloc(4, GFP_KERNEL);
++	if (!blocks)
++		return (u32)-1;
++
++	sg_init_one(&sg, blocks, 4);
+ 
+ 	mmc_wait_for_req(card->host, &mrq);
+ 
++	result = ntohl(*blocks);
++	kfree(blocks);
++
+ 	if (cmd.error || data.error)
+-		return (u32)-1;
++		result = (u32)-1;
+ 
+-	return ntohl(blocks);
++	return result;
+ }
+ 
+ static u32 get_card_status(struct mmc_card *card, struct request *req)
+-- 
+1.7.0.4
+

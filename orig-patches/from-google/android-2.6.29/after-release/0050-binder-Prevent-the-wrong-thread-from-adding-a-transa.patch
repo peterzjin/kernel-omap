@@ -1,0 +1,41 @@
+From 434294470c9bcd1ed61944800aafe0911f8bbdc6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Thu, 2 Apr 2009 19:07:31 -0700
+Subject: [PATCH 050/247] binder: Prevent the wrong thread from adding a transaction to the stack.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+If a thread is part of a transaction stack, it is only allowed to make
+another call if it was the target of the top transaction on the stack.
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+---
+ drivers/staging/android/binder.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/staging/android/binder.c b/drivers/staging/android/binder.c
+index 91a9629..b0127a3 100644
+--- a/drivers/staging/android/binder.c
++++ b/drivers/staging/android/binder.c
+@@ -1343,6 +1343,17 @@ binder_transaction(struct binder_proc *proc, struct binder_thread *thread,
+ 		if (!(tr->flags & TF_ONE_WAY) && thread->transaction_stack) {
+ 			struct binder_transaction *tmp;
+ 			tmp = thread->transaction_stack;
++			if (tmp->to_thread != thread) {
++				binder_user_error("binder: %d:%d got new "
++					"transaction with bad transaction stack"
++					", transaction %d has target %d:%d\n",
++					proc->pid, thread->pid, tmp->debug_id,
++					tmp->to_proc ? tmp->to_proc->pid : 0,
++					tmp->to_thread ?
++					tmp->to_thread->pid : 0);
++				return_error = BR_FAILED_REPLY;
++				goto err_bad_call_stack;
++			}
+ 			while (tmp) {
+ 				if (tmp->from && tmp->from->proc == target_proc)
+ 					target_thread = tmp->from;
+-- 
+1.7.0.4
+

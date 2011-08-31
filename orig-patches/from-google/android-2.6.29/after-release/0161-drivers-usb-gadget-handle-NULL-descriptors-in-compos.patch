@@ -1,0 +1,48 @@
+From 53cdc359a50f3cc35b63a37890ca096ab16b8a55 Mon Sep 17 00:00:00 2001
+From: Jared Suttles <jared.suttles@motorola.com>
+Date: Thu, 30 Jul 2009 16:13:27 -0500
+Subject: [PATCH 161/247] drivers: usb: gadget: handle NULL descriptors in composite config_buf
+
+This fixes a problem in enumeration after a gadget function is removed.
+
+Submitted on behalf of RaviKumar Vembu <ravi.v@motorola.com>
+
+Signed-off-by: Jared Suttles <jared.suttles@motorola.com>
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/composite.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index 5d11c29..283874d 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -235,6 +235,7 @@ static int config_buf(struct usb_configuration *config,
+ 	int				len = USB_BUFSIZ - USB_DT_CONFIG_SIZE;
+ 	struct usb_function		*f;
+ 	int				status;
++	int				interfaceCount = 0;
+ 
+ 	/* write the config descriptor */
+ 	c = buf;
+@@ -265,8 +266,16 @@ static int config_buf(struct usb_configuration *config,
+ 			descriptors = f->hs_descriptors;
+ 		else
+ 			descriptors = f->descriptors;
+-		if (!descriptors)
++		if (!descriptors || descriptors[0] == NULL) {
++			for (; f != config->interface[interfaceCount];) {
++				interfaceCount++;
++				c->bNumInterfaces--;
++			}
+ 			continue;
++		}
++		for (; f != config->interface[interfaceCount];)
++			interfaceCount++;
++
+ 		status = usb_descriptor_fillbuf(next, len,
+ 			(const struct usb_descriptor_header **) descriptors);
+ 		if (status < 0)
+-- 
+1.7.0.4
+

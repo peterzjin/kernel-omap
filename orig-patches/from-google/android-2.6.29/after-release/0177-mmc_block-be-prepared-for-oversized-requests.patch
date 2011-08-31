@@ -1,0 +1,39 @@
+From 333495c0cc589ba108deb386cc7eaffcae9070f4 Mon Sep 17 00:00:00 2001
+From: Pierre Ossman <pierre@ossman.eu>
+Date: Fri, 10 Apr 2009 17:52:57 +0200
+Subject: [PATCH 177/247] mmc_block: be prepared for oversized requests
+
+The block layer does not support very low sector count restrictions
+so we need to be prepared to handle bigger requests than we can send
+directly to the controller.
+
+Problem found by Manuel Lauss.
+
+Signed-off-by: Pierre Ossman <pierre@ossman.eu>
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/mmc/card/block.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 71c3e4a..6f48a94 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -288,6 +288,14 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
+ 		brq.data.blocks = req->nr_sectors;
+ 
+ 		/*
++		 * The block layer doesn't support all sector count
++		 * restrictions, so we need to be prepared for too big
++		 * requests.
++		 */
++		if (brq.data.blocks > card->host->max_blk_count)
++			brq.data.blocks = card->host->max_blk_count;
++
++		/*
+ 		 * After a read error, we redo the request one sector at a time
+ 		 * in order to accurately determine which sectors can be read
+ 		 * successfully.
+-- 
+1.7.0.4
+

@@ -1,0 +1,32 @@
+From aac0e68187f7bdb3fe07da16365dd483ceb5d05b Mon Sep 17 00:00:00 2001
+From: Andre Haupt <andre@bitwigglers.org>
+Date: Mon, 2 Feb 2009 14:45:11 -0800
+Subject: [PATCH 016/247] Bluetooth: Eliminate a sparse warning in bt3c driver
+
+This eliminates a sparse warning that symbol 'stat' shadows an earlier one.
+
+Signed-off-by: Andre Haupt <andre@bitwigglers.org>
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ drivers/bluetooth/bt3c_cs.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/bluetooth/bt3c_cs.c b/drivers/bluetooth/bt3c_cs.c
+index ff195c2..d58e22b 100644
+--- a/drivers/bluetooth/bt3c_cs.c
++++ b/drivers/bluetooth/bt3c_cs.c
+@@ -359,9 +359,9 @@ static irqreturn_t bt3c_interrupt(int irq, void *dev_inst)
+ 			BT_ERR("Very strange (stat=0x%04x)", stat);
+ 		} else if ((stat & 0xff) != 0xff) {
+ 			if (stat & 0x0020) {
+-				int stat = bt3c_read(iobase, 0x7002) & 0x10;
++				int status = bt3c_read(iobase, 0x7002) & 0x10;
+ 				BT_INFO("%s: Antenna %s", info->hdev->name,
+-							stat ? "out" : "in");
++							status ? "out" : "in");
+ 			}
+ 			if (stat & 0x0001)
+ 				bt3c_receive(info);
+-- 
+1.7.0.4
+

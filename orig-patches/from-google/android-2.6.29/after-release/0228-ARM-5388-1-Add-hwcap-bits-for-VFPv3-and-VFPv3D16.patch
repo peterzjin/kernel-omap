@@ -1,0 +1,71 @@
+From 7208d15ce43bc99a36582405e143bba21048fde2 Mon Sep 17 00:00:00 2001
+From: Catalin Marinas <catalin.marinas@arm.com>
+Date: Wed, 11 Feb 2009 13:13:56 +0100
+Subject: [PATCH 228/247] [ARM] 5388/1: Add hwcap bits for VFPv3 and VFPv3D16
+
+The VFPv3D16 is a VFPv3 CPU configuration where only 16 double registers
+are present, as the VFPv2 configuration. This patch adds the
+corresponding hwcap bits so that applications or debuggers have more
+information about the supported features.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+(cherry picked from commit 7279dc3e914635ab4b288ec39383272a06c466f3)
+---
+ arch/arm/include/asm/hwcap.h |    2 ++
+ arch/arm/kernel/setup.c      |    2 ++
+ arch/arm/vfp/vfpmodule.c     |   12 ++++++++++++
+ 3 files changed, 16 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/hwcap.h b/arch/arm/include/asm/hwcap.h
+index bda489f..f7bd52b 100644
+--- a/arch/arm/include/asm/hwcap.h
++++ b/arch/arm/include/asm/hwcap.h
+@@ -17,6 +17,8 @@
+ #define HWCAP_CRUNCH	1024
+ #define HWCAP_THUMBEE	2048
+ #define HWCAP_NEON	4096
++#define HWCAP_VFPv3	8192
++#define HWCAP_VFPv3D16	16384
+ 
+ #if defined(__KERNEL__) && !defined(__ASSEMBLY__)
+ /*
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 68d6494..d301a53 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -780,6 +780,8 @@ static const char *hwcap_str[] = {
+ 	"crunch",
+ 	"thumbee",
+ 	"neon",
++	"vfpv3",
++	"vfpv3d16",
+ 	NULL
+ };
+ 
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 7e12390..75457b3 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -476,6 +476,18 @@ static int __init vfp_init(void)
+ 		 * in place; report VFP support to userspace.
+ 		 */
+ 		elf_hwcap |= HWCAP_VFP;
++#ifdef CONFIG_VFPv3
++		if (VFP_arch >= 3) {
++			elf_hwcap |= HWCAP_VFPv3;
++
++			/*
++			 * Check for VFPv3 D16. CPUs in this configuration
++			 * only have 16 x 64bit registers.
++			 */
++			if (((fmrx(MVFR0) & MVFR0_A_SIMD_MASK)) == 1)
++				elf_hwcap |= HWCAP_VFPv3D16;
++		}
++#endif
+ #ifdef CONFIG_NEON
+ 		/*
+ 		 * Check for the presence of the Advanced SIMD
+-- 
+1.7.0.4
+

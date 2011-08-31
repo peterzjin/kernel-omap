@@ -1,0 +1,53 @@
+From 03f14d7328e53b3e654eb1b90fe6e5316583d173 Mon Sep 17 00:00:00 2001
+From: Joe Swantek <joseph.swantek@motorola.com>
+Date: Tue, 15 Dec 2009 07:46:34 -0500
+Subject: [PATCH 244/247] USB: gadget: android: Allow functions to handle setup requests.
+
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/android.c |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/usb/gadget/android.c b/drivers/usb/gadget/android.c
+index e3499ec..afce102 100644
+--- a/drivers/usb/gadget/android.c
++++ b/drivers/usb/gadget/android.c
+@@ -134,14 +134,35 @@ static int __init android_bind_config(struct usb_configuration *c)
+ 	return adb_function_add(dev->cdev, c);
+ }
+ 
++static int android_setup_config(struct usb_configuration *c,
++		const struct usb_ctrlrequest *ctrl);
++
+ static struct usb_configuration android_config_driver = {
+ 	.label		= "android",
+ 	.bind		= android_bind_config,
++	.setup		= android_setup_config,
+ 	.bConfigurationValue = 1,
+ 	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
+ 	.bMaxPower	= 0xFA, /* 500ma */
+ };
+ 
++static int android_setup_config(struct usb_configuration *c,
++		const struct usb_ctrlrequest *ctrl)
++{
++	int i;
++	int ret = -EOPNOTSUPP;
++
++	for (i = 0; i < android_config_driver.next_interface_id; i++) {
++		if (android_config_driver.interface[i]->setup) {
++			ret = android_config_driver.interface[i]->setup(
++				android_config_driver.interface[i], ctrl);
++			if (ret >= 0)
++				return ret;
++		}
++	}
++	return ret;
++}
++
+ static int __init android_bind(struct usb_composite_dev *cdev)
+ {
+ 	struct android_dev *dev = _android_dev;
+-- 
+1.7.0.4
+

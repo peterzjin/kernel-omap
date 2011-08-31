@@ -1,0 +1,43 @@
+From a17971fce5c2f14326bec2947a219db2b87083f2 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jos=C3=A9=20M.=20Fern=C3=A1ndez?= <josemariafg@gmail.com>
+Date: Tue, 10 Mar 2009 02:21:21 +0100
+Subject: [PATCH 178/247] mmc: increase power up delay
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The TI controller on Toshiba Tecra M5 needs more time to power up or
+the cards will init incorrectly or not at all.
+
+Signed-off-by: José M. Fernández <josemariafg@gmail.com>
+Signed-off-by: Pierre Ossman <pierre@ossman.eu>
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/mmc/core/core.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index eda54c4..034d615 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -594,7 +594,7 @@ static void mmc_power_up(struct mmc_host *host)
+ 	 * This delay should be sufficient to allow the power supply
+ 	 * to reach the minimum voltage.
+ 	 */
+-	mmc_delay(2);
++	mmc_delay(10);
+ 
+ 	host->ios.clock = host->f_min;
+ 	host->ios.power_mode = MMC_POWER_ON;
+@@ -604,7 +604,7 @@ static void mmc_power_up(struct mmc_host *host)
+ 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
+ 	 * time required to reach a stable voltage.
+ 	 */
+-	mmc_delay(2);
++	mmc_delay(10);
+ }
+ 
+ static void mmc_power_off(struct mmc_host *host)
+-- 
+1.7.0.4
+

@@ -1,0 +1,27 @@
+From 63b9fe6c840c8a2fd9230f6db5f9533d4232771f Mon Sep 17 00:00:00 2001
+From: San Mehat <san@google.com>
+Date: Wed, 16 Sep 2009 12:39:10 -0700
+Subject: [PATCH 199/247] proc: smaps: Allow smaps access for CAP_SYS_RESOURCE
+
+Signed-off-by: San Mehat <san@google.com>
+---
+ fs/proc/base.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/fs/proc/base.c b/fs/proc/base.c
+index 93d926c..54e9cc9 100644
+--- a/fs/proc/base.c
++++ b/fs/proc/base.c
+@@ -258,7 +258,8 @@ struct mm_struct *mm_for_maps(struct task_struct *task)
+ 	if (task->mm != mm)
+ 		goto out;
+ 	if (task->mm != current->mm &&
+-	    __ptrace_may_access(task, PTRACE_MODE_READ) < 0)
++	    __ptrace_may_access(task, PTRACE_MODE_READ) < 0 &&
++	    !capable(CAP_SYS_RESOURCE))
+ 		goto out;
+ 	task_unlock(task);
+ 	return mm;
+-- 
+1.7.0.4
+

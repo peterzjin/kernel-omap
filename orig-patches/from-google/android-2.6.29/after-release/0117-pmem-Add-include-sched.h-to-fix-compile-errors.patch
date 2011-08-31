@@ -1,0 +1,25 @@
+From 3a218ab75fae6fbb7b91d744eab2aab6a3946a6e Mon Sep 17 00:00:00 2001
+From: Rebecca Schultz Zavin <rebecca@android.com>
+Date: Sun, 29 Mar 2009 20:58:38 -0700
+Subject: [PATCH 117/247] pmem: Add include sched.h to fix compile errors
+
+Signed-off-by: Rebecca Schultz Zavin <rebecca@android.com>
+---
+ drivers/misc/pmem.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/misc/pmem.c b/drivers/misc/pmem.c
+index 44c0ae8..def6468 100644
+--- a/drivers/misc/pmem.c
++++ b/drivers/misc/pmem.c
+@@ -22,6 +22,7 @@
+ #include <linux/debugfs.h>
+ #include <linux/android_pmem.h>
+ #include <linux/mempolicy.h>
++#include <linux/sched.h>
+ #include <asm/io.h>
+ #include <asm/uaccess.h>
+ #include <asm/cacheflush.h>
+-- 
+1.7.0.4
+

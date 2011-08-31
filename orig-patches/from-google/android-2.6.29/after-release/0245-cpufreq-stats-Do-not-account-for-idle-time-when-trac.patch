@@ -1,0 +1,148 @@
+From 1d67e57e011d7495b39709658a74354b4b9b3615 Mon Sep 17 00:00:00 2001
+From: Mike Chan <mike@android.com>
+Date: Tue, 12 Jan 2010 12:11:06 -0800
+Subject: [PATCH 245/247] cpufreq: stats: Do not account for idle time when tracking time_in_state
+
+Setting ignore_idle to 1 ignores idle time from time_in_state accounting.
+
+Currently cpufreq stats accounts for idle time time_in_state for each
+cpu speed. For cpu's that have a low power idle state this improperly
+accounts for time spent at each speed.
+
+The most relevant case is when the system is idle yet cpu time is still
+accounted for at the lowest speed. This results in heavily skewed statistics
+(towards the lowest speed) which makes these statistics useless when tuning
+cpufreq scaling with cpuidle.
+
+Change-Id: I156c9ec3b23a4720e02fdf6b7dc25503dac84502
+Signed-off-by: Mike Chan <mike@android.com>
+---
+ drivers/cpufreq/cpufreq_stats.c |   44 +++++++++++++++++++++++++++++++++++---
+ include/linux/cpufreq.h         |    5 ++++
+ kernel/sched.c                  |    2 +
+ 3 files changed, 47 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+index c0ff97d..ee53ccb 100644
+--- a/drivers/cpufreq/cpufreq_stats.c
++++ b/drivers/cpufreq/cpufreq_stats.c
+@@ -23,10 +23,11 @@
+ 
+ static spinlock_t cpufreq_stats_lock;
+ 
+-#define CPUFREQ_STATDEVICE_ATTR(_name,_mode,_show) \
++#define CPUFREQ_STATDEVICE_ATTR(_name,_mode,_show, _store) \
+ static struct freq_attr _attr_##_name = {\
+ 	.attr = {.name = __stringify(_name), .mode = _mode, }, \
+ 	.show = _show,\
++	.store = _store,\
+ };
+ 
+ struct cpufreq_stats {
+@@ -43,6 +44,8 @@ struct cpufreq_stats {
+ #endif
+ };
+ 
++static int ignore_idle;
++
+ static DEFINE_PER_CPU(struct cpufreq_stats *, cpufreq_stats_table);
+ 
+ struct cpufreq_stats_attribute {
+@@ -139,15 +142,33 @@ show_trans_table(struct cpufreq_policy *policy, char *buf)
+ 		return PAGE_SIZE;
+ 	return len;
+ }
+-CPUFREQ_STATDEVICE_ATTR(trans_table,0444,show_trans_table);
++CPUFREQ_STATDEVICE_ATTR(trans_table,0444,show_trans_table, NULL);
+ #endif
+ 
+-CPUFREQ_STATDEVICE_ATTR(total_trans,0444,show_total_trans);
+-CPUFREQ_STATDEVICE_ATTR(time_in_state,0444,show_time_in_state);
++static ssize_t store_ignore_idle(struct cpufreq_policy *policy, char *buf)
++{
++	int input;
++	if (sscanf(buf, "%d", &input) != 1)
++		return -EINVAL;
++
++	ignore_idle = input;
++	return 1;
++}
++
++static ssize_t show_ignore_idle(struct cpufreq_policy *policy, char *buf)
++{
++	return sprintf(buf, "%d\n", ignore_idle);
++}
++
++CPUFREQ_STATDEVICE_ATTR(total_trans,0444,show_total_trans, NULL);
++CPUFREQ_STATDEVICE_ATTR(time_in_state,0444,show_time_in_state, NULL);
++CPUFREQ_STATDEVICE_ATTR(ignore_idle, 0664, show_ignore_idle, store_ignore_idle);
++
+ 
+ static struct attribute *default_attrs[] = {
+ 	&_attr_total_trans.attr,
+ 	&_attr_time_in_state.attr,
++	&_attr_ignore_idle.attr,
+ #ifdef CONFIG_CPU_FREQ_STAT_DETAILS
+ 	&_attr_trans_table.attr,
+ #endif
+@@ -308,6 +329,21 @@ cpufreq_stat_notifier_trans (struct notifier_block *nb, unsigned long val,
+ 	return 0;
+ }
+ 
++void cpufreq_exit_idle(int cpu, unsigned long ticks)
++{
++	struct cpufreq_stats *stat;
++	stat = per_cpu(cpufreq_stats_table, cpu);
++
++	/* Wait until cpu stats is initalized */
++	if (!ignore_idle || !stat || !stat->time_in_state)
++		return;
++
++	spin_lock(&cpufreq_stats_lock);
++	stat->time_in_state[stat->last_index] =
++		cputime_sub(stat->time_in_state[stat->last_index], ticks);
++	spin_unlock(&cpufreq_stats_lock);
++}
++
+ static int __cpuinit cpufreq_stat_cpu_callback(struct notifier_block *nfb,
+ 					       unsigned long action,
+ 					       void *hcpu)
+diff --git a/include/linux/cpufreq.h b/include/linux/cpufreq.h
+index 1610427..83fcfa7 100644
+--- a/include/linux/cpufreq.h
++++ b/include/linux/cpufreq.h
+@@ -252,6 +252,11 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
+ 
+ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state);
+ 
++#ifdef CONFIG_CPU_FREQ_STAT
++extern void cpufreq_exit_idle(int cpu, unsigned long ticks);
++#else
++#define cpufreq_exit_idle(int cpu, unsigned long ticks) do {} while (0)
++#endif
+ 
+ static inline void cpufreq_verify_within_limits(struct cpufreq_policy *policy, unsigned int min, unsigned int max) 
+ {
+diff --git a/kernel/sched.c b/kernel/sched.c
+index f20bab0..781cf8b 100644
+--- a/kernel/sched.c
++++ b/kernel/sched.c
+@@ -53,6 +53,7 @@
+ #include <linux/rcupdate.h>
+ #include <linux/cpu.h>
+ #include <linux/cpuset.h>
++#include <linux/cpufreq.h>
+ #include <linux/percpu.h>
+ #include <linux/kthread.h>
+ #include <linux/proc_fs.h>
+@@ -4362,6 +4363,7 @@ void account_steal_ticks(unsigned long ticks)
+  */
+ void account_idle_ticks(unsigned long ticks)
+ {
++	cpufreq_exit_idle(smp_processor_id(), ticks);
+ 	account_idle_time(jiffies_to_cputime(ticks));
+ }
+ 
+-- 
+1.7.0.4
+

@@ -1,0 +1,40 @@
+From 191805ac41a63929003faa33365027d3fb924d71 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Wed, 14 Jan 2009 16:54:16 -0800
+Subject: [PATCH 18/19] Staging: android: Add lowmemorykiller documentation.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+---
+ drivers/staging/android/lowmemorykiller.txt |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/staging/android/lowmemorykiller.txt
+
+diff --git a/drivers/staging/android/lowmemorykiller.txt b/drivers/staging/android/lowmemorykiller.txt
+new file mode 100644
+index 0000000..bd5c0c0
+--- /dev/null
++++ b/drivers/staging/android/lowmemorykiller.txt
+@@ -0,0 +1,16 @@
++The lowmemorykiller driver lets user-space specify a set of memory thresholds
++where processes with a range of oom_adj values will get killed. Specify the
++minimum oom_adj values in /sys/module/lowmemorykiller/parameters/adj and the
++number of free pages in /sys/module/lowmemorykiller/parameters/minfree. Both
++files take a comma separated list of numbers in ascending order.
++
++For example, write "0,8" to /sys/module/lowmemorykiller/parameters/adj and
++"1024,4096" to /sys/module/lowmemorykiller/parameters/minfree to kill processes
++with a oom_adj value of 8 or higher when the free memory drops below 4096 pages
++and kill processes with a oom_adj value of 0 or higher when the free memory
++drops below 1024 pages.
++
++The driver considers memory used for caches to be free, but if a large
++percentage of the cached memory is locked this can be very inaccurate
++and processes may not get killed until the normal oom killer is triggered.
++
+-- 
+1.7.0.4
+

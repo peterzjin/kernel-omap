@@ -1,0 +1,37 @@
+From f6e195a306555420312a8b39c9d8e3b7bfdaad15 Mon Sep 17 00:00:00 2001
+From: Andrei Emeltchenko <andrei.emeltchenko.news@gmail.com>
+Date: Thu, 3 Sep 2009 12:34:19 +0300
+Subject: [PATCH 219/247] Bluetooth: Set general bonding security for ACL by default
+
+This patch fixes double pairing issues with SSP.
+
+It was observed that when pairing with SSP bluez asks confirmation
+2 times.
+http://www.spinics.net/lists/linux-bluetooth/msg02473.html
+
+This also causes bug when we initiate SSP connection from Vista.
+
+The reason is because bluetoothd does not store link keys since
+ioctl  HCIGETAUTHINFO returns 0. Setting default general
+bonding fixes these issues.
+
+Signed-off-by: Andrei Emeltchenko <andrei.emeltchenko.news@gmail.com>
+---
+ net/bluetooth/hci_conn.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/net/bluetooth/hci_conn.c b/net/bluetooth/hci_conn.c
+index 93517ea..055ac57 100644
+--- a/net/bluetooth/hci_conn.c
++++ b/net/bluetooth/hci_conn.c
+@@ -213,6 +213,7 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst)
+ 	conn->type  = type;
+ 	conn->mode  = HCI_CM_ACTIVE;
+ 	conn->state = BT_OPEN;
++	conn->auth_type = HCI_AT_GENERAL_BONDING;
+ 
+ 	conn->power_save = 1;
+ 
+-- 
+1.7.0.4
+

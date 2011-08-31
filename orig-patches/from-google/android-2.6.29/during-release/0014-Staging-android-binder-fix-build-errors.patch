@@ -1,0 +1,75 @@
+From 7a9c67a6ad2e6911e7ebdae34a75835c537d6e84 Mon Sep 17 00:00:00 2001
+From: Greg Kroah-Hartman <gregkh@suse.de>
+Date: Sat, 20 Dec 2008 20:20:02 -0800
+Subject: [PATCH 14/14] Staging: android: binder: fix build errors
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This fixes the build errors and warnings in the binder driver.  It can't
+be a module, due to a lack of some of the symbols being exported.
+
+Also added a MODULE_LICENSE(), as it was missing.
+
+Cc: Arve Hjønnevåg <arve@android.com>
+Cc: Brian Swetland <swetland@google.com>
+Cc: Robert Love <rlove@google.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+---
+ drivers/staging/android/Kconfig  |    4 ++--
+ drivers/staging/android/binder.c |    7 ++++---
+ 2 files changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/staging/android/Kconfig b/drivers/staging/android/Kconfig
+index 934f6f2..6b996db 100644
+--- a/drivers/staging/android/Kconfig
++++ b/drivers/staging/android/Kconfig
+@@ -7,8 +7,8 @@ config ANDROID
+ 	  Enable support for various drivers needed on the Android platform
+ 
+ config ANDROID_BINDER_IPC
+-	tristate "Android Binder IPC Driver"
+-	default y
++	bool "Android Binder IPC Driver"
++	default n
+ 
+ config ANDROID_LOGGER
+ 	tristate "Android log driver"
+diff --git a/drivers/staging/android/binder.c b/drivers/staging/android/binder.c
+index 7c3da5a..6a4ceac 100644
+--- a/drivers/staging/android/binder.c
++++ b/drivers/staging/android/binder.c
+@@ -2649,14 +2649,14 @@ static void binder_vma_open(struct vm_area_struct *vma)
+ {
+ 	struct binder_proc *proc = vma->vm_private_data;
+ 	if (binder_debug_mask & BINDER_DEBUG_OPEN_CLOSE)
+-		printk(KERN_INFO "binder: %d open vm area %lx-%lx (%ld K) vma %lx pagep %lx\n", proc->pid, vma->vm_start, vma->vm_end, (vma->vm_end - vma->vm_start) / SZ_1K, vma->vm_flags, vma->vm_page_prot);
++		printk(KERN_INFO "binder: %d open vm area %lx-%lx (%ld K) vma %lx pagep %lx\n", proc->pid, vma->vm_start, vma->vm_end, (vma->vm_end - vma->vm_start) / SZ_1K, vma->vm_flags, vma->vm_page_prot.pgprot);
+ 	dump_stack();
+ }
+ static void binder_vma_close(struct vm_area_struct *vma)
+ {
+ 	struct binder_proc *proc = vma->vm_private_data;
+ 	if (binder_debug_mask & BINDER_DEBUG_OPEN_CLOSE)
+-		printk(KERN_INFO "binder: %d close vm area %lx-%lx (%ld K) vma %lx pagep %lx\n", proc->pid, vma->vm_start, vma->vm_end, (vma->vm_end - vma->vm_start) / SZ_1K, vma->vm_flags, vma->vm_page_prot);
++		printk(KERN_INFO "binder: %d close vm area %lx-%lx (%ld K) vma %lx pagep %lx\n", proc->pid, vma->vm_start, vma->vm_end, (vma->vm_end - vma->vm_start) / SZ_1K, vma->vm_flags, vma->vm_page_prot.pgprot);
+ 	proc->vma = NULL;
+ }
+ 
+@@ -2677,7 +2677,7 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
+ 		vma->vm_end = vma->vm_start + SZ_4M;
+ 
+ 	if (binder_debug_mask & BINDER_DEBUG_OPEN_CLOSE)
+-		printk(KERN_INFO "binder_mmap: %d %lx-%lx (%ld K) vma %lx pagep %lx\n", proc->pid, vma->vm_start, vma->vm_end, (vma->vm_end - vma->vm_start) / SZ_1K, vma->vm_flags, vma->vm_page_prot);
++		printk(KERN_INFO "binder_mmap: %d %lx-%lx (%ld K) vma %lx pagep %lx\n", proc->pid, vma->vm_start, vma->vm_end, (vma->vm_end - vma->vm_start) / SZ_1K, vma->vm_flags, vma->vm_page_prot.pgprot);
+ 
+ 	if (vma->vm_flags & FORBIDDEN_MMAP_FLAGS) {
+ 		ret = -EPERM;
+@@ -3500,3 +3500,4 @@ static int __init binder_init(void)
+ 
+ device_initcall(binder_init);
+ 
++MODULE_LICENSE("GPL v2");
+-- 
+1.7.0.4
+

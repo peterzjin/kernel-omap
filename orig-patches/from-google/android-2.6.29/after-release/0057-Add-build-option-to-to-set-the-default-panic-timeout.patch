@@ -1,0 +1,46 @@
+From 539f6c334f7d44d8689200ad74dbc230086a8d87 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Tue, 8 May 2007 15:39:13 +0700
+Subject: [PATCH 057/247] Add build option to to set the default panic timeout.
+
+---
+ init/Kconfig   |    6 ++++++
+ kernel/panic.c |    5 ++++-
+ 2 files changed, 10 insertions(+), 1 deletions(-)
+
+diff --git a/init/Kconfig b/init/Kconfig
+index 6a5c5fe..0822e30 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -678,6 +678,12 @@ config SYSCTL
+ config ANON_INODES
+ 	bool
+ 
++config PANIC_TIMEOUT
++	int "Default panic timeout"
++	default 0
++	help
++	  Set default panic timeout.
++
+ menuconfig EMBEDDED
+ 	bool "Configure standard kernel features (for small systems)"
+ 	help
+diff --git a/kernel/panic.c b/kernel/panic.c
+index 2a2ff36..28fb97b 100644
+--- a/kernel/panic.c
++++ b/kernel/panic.c
+@@ -29,7 +29,10 @@ static int pause_on_oops;
+ static int pause_on_oops_flag;
+ static DEFINE_SPINLOCK(pause_on_oops_lock);
+ 
+-int panic_timeout;
++#ifndef CONFIG_PANIC_TIMEOUT
++#define CONFIG_PANIC_TIMEOUT 0
++#endif
++int panic_timeout = CONFIG_PANIC_TIMEOUT;
+ 
+ ATOMIC_NOTIFIER_HEAD(panic_notifier_list);
+ 
+-- 
+1.7.0.4
+

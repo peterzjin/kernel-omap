@@ -1,0 +1,218 @@
+From c44770721b7984185c8c2d3d21df010dbecead36 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Thu, 15 Jan 2009 21:52:14 +0100
+Subject: [PATCH 002/247] Bluetooth: Preparation for usage of SOL_BLUETOOTH
+
+The socket option levels SOL_L2CAP, SOL_RFOMM and SOL_SCO are currently
+in use by various Bluetooth applications. Going forward the common
+option level SOL_BLUETOOTH should be used. This patch prepares the clean
+split of the old and new option levels while keeping everything backward
+compatibility.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/l2cap.c       |   51 +++++++++++++++++++++++++++++++++++++++++-
+ net/bluetooth/rfcomm/sock.c |   51 +++++++++++++++++++++++++++++++++++++++++-
+ net/bluetooth/sco.c         |   27 ++++++++++++++++++++++-
+ 3 files changed, 124 insertions(+), 5 deletions(-)
+
+diff --git a/net/bluetooth/l2cap.c b/net/bluetooth/l2cap.c
+index b93748e..df1a95e 100644
+--- a/net/bluetooth/l2cap.c
++++ b/net/bluetooth/l2cap.c
+@@ -1106,7 +1106,7 @@ static int l2cap_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct ms
+ 	return err;
+ }
+ 
+-static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
++static int l2cap_sock_setsockopt_old(struct socket *sock, int optname, char __user *optval, int optlen)
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct l2cap_options opts;
+@@ -1152,7 +1152,29 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
+ 	return err;
+ }
+ 
+-static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
++static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
++{
++	struct sock *sk = sock->sk;
++	int err = 0;
++
++	BT_DBG("sk %p", sk);
++
++	if (level == SOL_L2CAP)
++		return l2cap_sock_setsockopt_old(sock, optname, optval, optlen);
++
++	lock_sock(sk);
++
++	switch (optname) {
++	default:
++		err = -ENOPROTOOPT;
++		break;
++	}
++
++	release_sock(sk);
++	return err;
++}
++
++static int l2cap_sock_getsockopt_old(struct socket *sock, int optname, char __user *optval, int __user *optlen)
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct l2cap_options opts;
+@@ -1208,6 +1230,31 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
+ 	return err;
+ }
+ 
++static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
++{
++	struct sock *sk = sock->sk;
++	int len, err = 0;
++
++	BT_DBG("sk %p", sk);
++
++	if (level == SOL_L2CAP)
++		return l2cap_sock_getsockopt_old(sock, optname, optval, optlen);
++
++	if (get_user(len, optlen))
++		return -EFAULT;
++
++	lock_sock(sk);
++
++	switch (optname) {
++	default:
++		err = -ENOPROTOOPT;
++		break;
++	}
++
++	release_sock(sk);
++	return err;
++}
++
+ static int l2cap_sock_shutdown(struct socket *sock, int how)
+ {
+ 	struct sock *sk = sock->sk;
+diff --git a/net/bluetooth/rfcomm/sock.c b/net/bluetooth/rfcomm/sock.c
+index ce505f2..65dd713 100644
+--- a/net/bluetooth/rfcomm/sock.c
++++ b/net/bluetooth/rfcomm/sock.c
+@@ -713,7 +713,7 @@ out:
+ 	return copied ? : err;
+ }
+ 
+-static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
++static int rfcomm_sock_setsockopt_old(struct socket *sock, int optname, char __user *optval, int optlen)
+ {
+ 	struct sock *sk = sock->sk;
+ 	int err = 0;
+@@ -742,7 +742,29 @@ static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, c
+ 	return err;
+ }
+ 
+-static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
++static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
++{
++	struct sock *sk = sock->sk;
++	int err = 0;
++
++	BT_DBG("sk %p", sk);
++
++	if (level == SOL_RFCOMM)
++		return rfcomm_sock_setsockopt_old(sock, optname, optval, optlen);
++
++	lock_sock(sk);
++
++	switch (optname) {
++	default:
++		err = -ENOPROTOOPT;
++		break;
++	}
++
++	release_sock(sk);
++	return err;
++}
++
++static int rfcomm_sock_getsockopt_old(struct socket *sock, int optname, char __user *optval, int __user *optlen)
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct sock *l2cap_sk;
+@@ -788,6 +810,31 @@ static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, c
+ 	return err;
+ }
+ 
++static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
++{
++	struct sock *sk = sock->sk;
++	int len, err = 0;
++
++	BT_DBG("sk %p", sk);
++
++	if (level == SOL_RFCOMM)
++		return rfcomm_sock_getsockopt_old(sock, optname, optval, optlen);
++
++	if (get_user(len, optlen))
++		return -EFAULT;
++
++	lock_sock(sk);
++
++	switch (optname) {
++	default:
++		err = -ENOPROTOOPT;
++		break;
++	}
++
++	release_sock(sk);
++	return err;
++}
++
+ static int rfcomm_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+ {
+ 	struct sock *sk __maybe_unused = sock->sk;
+diff --git a/net/bluetooth/sco.c b/net/bluetooth/sco.c
+index 46fd8bf..dea40d4 100644
+--- a/net/bluetooth/sco.c
++++ b/net/bluetooth/sco.c
+@@ -668,7 +668,7 @@ static int sco_sock_setsockopt(struct socket *sock, int level, int optname, char
+ 	return err;
+ }
+ 
+-static int sco_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
++static int sco_sock_getsockopt_old(struct socket *sock, int optname, char __user *optval, int __user *optlen)
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct sco_options opts;
+@@ -723,6 +723,31 @@ static int sco_sock_getsockopt(struct socket *sock, int level, int optname, char
+ 	return err;
+ }
+ 
++static int sco_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
++{
++	struct sock *sk = sock->sk;
++	int len, err = 0;
++
++	BT_DBG("sk %p", sk);
++
++	if (level == SOL_SCO)
++		return sco_sock_getsockopt_old(sock, optname, optval, optlen);
++
++	if (get_user(len, optlen))
++		return -EFAULT;
++
++	lock_sock(sk);
++
++	switch (optname) {
++	default:
++		err = -ENOPROTOOPT;
++		break;
++	}
++
++	release_sock(sk);
++	return err;
++}
++
+ static int sco_sock_release(struct socket *sock)
+ {
+ 	struct sock *sk = sock->sk;
+-- 
+1.7.0.4
+

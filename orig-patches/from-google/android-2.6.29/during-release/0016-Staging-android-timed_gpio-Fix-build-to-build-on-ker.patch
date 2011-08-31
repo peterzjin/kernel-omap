@@ -1,0 +1,28 @@
+From 2d0db6bf5010c26beb1ccbd4ee50991fd2c05d90 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Thu, 8 Jan 2009 16:48:46 -0800
+Subject: [PATCH 16/19] Staging: android: timed_gpio: Fix build to build on kernels after 2.6.25.
+
+Reported-by: Randy Dunlap <randy.dunlap@oracle.com>
+Cc: Mike Lockwood <lockwood@android.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+---
+ drivers/staging/android/timed_gpio.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/staging/android/timed_gpio.c b/drivers/staging/android/timed_gpio.c
+index bea68c9..b41b20e 100644
+--- a/drivers/staging/android/timed_gpio.c
++++ b/drivers/staging/android/timed_gpio.c
+@@ -18,7 +18,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/hrtimer.h>
+ #include <linux/err.h>
+-#include <asm/arch/gpio.h>
++#include <linux/gpio.h>
+ 
+ #include "timed_gpio.h"
+ 
+-- 
+1.7.0.4
+

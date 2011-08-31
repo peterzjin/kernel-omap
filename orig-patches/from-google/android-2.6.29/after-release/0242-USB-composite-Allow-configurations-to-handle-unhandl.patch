@@ -1,0 +1,43 @@
+From e234646cf5f913746c8abd9ec696e0c246fd50fd Mon Sep 17 00:00:00 2001
+From: Joe Swantek <joseph.swantek@motorola.com>
+Date: Tue, 15 Dec 2009 07:17:40 -0500
+Subject: [PATCH 242/247] USB: composite: Allow configurations to handle unhandled setup requests
+
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/composite.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index aa3d748..5cd5f8c 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -835,6 +835,25 @@ unknown:
+ 				value = c->setup(c, ctrl);
+ 		}
+ 
++		/* If the vendor request is not processed (value < 0),
++		 * call all device registered configure setup callbacks
++		 * to process it.
++		 * This is used to handle the following cases:
++		 * - vendor request is for the device and arrives before
++		 * setconfiguration.
++		 * - Some devices are required to handle vendor request before
++		 * setconfiguration such as MTP, USBNET.
++		 */
++
++		if (value < 0) {
++			struct usb_configuration        *cfg;
++
++			list_for_each_entry(cfg, &cdev->configs, list) {
++			if (cfg && cfg->setup)
++				value = cfg->setup(cfg, ctrl);
++			}
++		}
++
+ 		goto done;
+ 	}
+ 
+-- 
+1.7.0.4
+

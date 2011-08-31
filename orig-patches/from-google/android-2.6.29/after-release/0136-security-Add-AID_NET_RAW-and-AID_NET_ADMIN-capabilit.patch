@@ -1,0 +1,53 @@
+From 964fc4881b3f3c90ec3a59350464d39158b88d52 Mon Sep 17 00:00:00 2001
+From: Chia-chi Yeh <chiachi@android.com>
+Date: Fri, 19 Jun 2009 07:15:05 +0800
+Subject: [PATCH 136/247] security: Add AID_NET_RAW and AID_NET_ADMIN capability check in cap_capable().
+
+Signed-off-by: Chia-chi Yeh <chiachi@android.com>
+---
+ include/linux/android_aid.h |    1 +
+ security/commoncap.c        |   10 ++++++++++
+ 2 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/android_aid.h b/include/linux/android_aid.h
+index d22723a..7f16a14 100644
+--- a/include/linux/android_aid.h
++++ b/include/linux/android_aid.h
+@@ -21,5 +21,6 @@
+ #define AID_NET_BT       3002
+ #define AID_INET         3003
+ #define AID_NET_RAW      3004
++#define AID_NET_ADMIN    3005
+ 
+ #endif
+diff --git a/security/commoncap.c b/security/commoncap.c
+index 7cd61a5..5689328 100644
+--- a/security/commoncap.c
++++ b/security/commoncap.c
+@@ -28,6 +28,10 @@
+ #include <linux/prctl.h>
+ #include <linux/securebits.h>
+ 
++#ifdef CONFIG_ANDROID_PARANOID_NETWORK
++#include <linux/android_aid.h>
++#endif
++
+ int cap_netlink_send(struct sock *sk, struct sk_buff *skb)
+ {
+ 	NETLINK_CB(skb).eff_cap = current_cap();
+@@ -60,6 +64,12 @@ EXPORT_SYMBOL(cap_netlink_recv);
+ int cap_capable(struct task_struct *tsk, const struct cred *cred, int cap,
+ 		int audit)
+ {
++#ifdef CONFIG_ANDROID_PARANOID_NETWORK
++	if (cap == CAP_NET_RAW && in_egroup_p(AID_NET_RAW))
++		return 0;
++	if (cap == CAP_NET_ADMIN && in_egroup_p(AID_NET_ADMIN))
++		return 0;
++#endif
+ 	return cap_raised(cred->cap_effective, cap) ? 0 : -EPERM;
+ }
+ 
+-- 
+1.7.0.4
+

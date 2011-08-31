@@ -1,0 +1,44 @@
+From 71380224e78a7aacbd3b2f657f64815184e0206d Mon Sep 17 00:00:00 2001
+From: Jared Suttles <jared.suttles@motorola.com>
+Date: Fri, 7 Aug 2009 18:57:49 -0500
+Subject: [PATCH 166/247] USB: composite: Fix USB WHQL Certification Issues
+
+Submitted on behalf of RaviKumar Vembu <ravi.v@motorola.com>
+Signed-off-by: Jared Suttles <jared.suttles@motorola.com>
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/composite.c |    9 ++++++---
+ 1 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index 283874d..6995a10 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -764,11 +764,11 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
+ 	case USB_REQ_GET_CONFIGURATION:
+ 		if (ctrl->bRequestType != USB_DIR_IN)
+ 			goto unknown;
+-		if (cdev->config)
++		if (cdev->config) {
+ 			*(u8 *)req->buf = cdev->config->bConfigurationValue;
+-		else
++			value = min(w_length, (u16) 1);
++		} else
+ 			*(u8 *)req->buf = 0;
+-		value = min(w_length, (u16) 1);
+ 		break;
+ 
+ 	/* function drivers must handle get/set altsetting; if there's
+@@ -818,6 +818,9 @@ unknown:
+ 		 */
+ 		if ((ctrl->bRequestType & USB_RECIP_MASK)
+ 				== USB_RECIP_INTERFACE) {
++			if (cdev->config == NULL)
++				return value;
++
+ 			f = cdev->config->interface[intf];
+ 			if (f && f->setup)
+ 				value = f->setup(f, ctrl);
+-- 
+1.7.0.4
+

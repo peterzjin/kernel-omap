@@ -1,0 +1,41 @@
+From b090f9fa53d51c8a33370071de9e391919ee1fa7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Sat, 14 Feb 2009 02:06:17 +0100
+Subject: [PATCH 22/23] PM: Wait for console in resume
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Avoids later waking up to a blinking cursor if the device woke up and
+returned to sleep before the console switch happened.
+
+Signed-off-by: Brian Swetland <swetland@google.com>
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
+Cc: Len Brown <lenb@kernel.org>
+Cc: Greg KH <gregkh@suse.de>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ kernel/power/console.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/kernel/power/console.c b/kernel/power/console.c
+index b8628be..a3961b2 100644
+--- a/kernel/power/console.c
++++ b/kernel/power/console.c
+@@ -78,6 +78,12 @@ void pm_restore_console(void)
+ 	}
+ 	set_console(orig_fgconsole);
+ 	release_console_sem();
++
++	if (vt_waitactive(orig_fgconsole)) {
++		pr_debug("Resume: Can't switch VCs.");
++		return;
++	}
++
+ 	kmsg_redirect = orig_kmsg;
+ }
+ #endif
+-- 
+1.7.0.4
+

@@ -1,0 +1,49 @@
+From 79345da35c9be9952aaba9ea2caca3cfb1e24814 Mon Sep 17 00:00:00 2001
+From: Dave Young <hidave.darkstar@gmail.com>
+Date: Sat, 31 Jan 2009 13:51:15 +0800
+Subject: [PATCH 015/247] Bluetooth: Remove CONFIG_DEBUG_LOCK_ALLOC ifdefs
+
+Due to lockdep changes, the CONFIG_DEBUG_LOCK_ALLOC ifdef is not needed
+now. So just remove it here.
+
+The following commit fixed the !lockdep build warnings:
+
+commit e8f6fbf62de37cbc2e179176ac7010d5f4396b67
+Author: Ingo Molnar <mingo@elte.hu>
+Date:   Wed Nov 12 01:38:36 2008 +0000
+
+    lockdep: include/linux/lockdep.h - fix warning in net/bluetooth/af_bluetooth.c
+
+Signed-off-by: Dave Young <hidave.darkstar@gmail.com>
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/af_bluetooth.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
+
+diff --git a/net/bluetooth/af_bluetooth.c b/net/bluetooth/af_bluetooth.c
+index 0d1b94d..ded5797 100644
+--- a/net/bluetooth/af_bluetooth.c
++++ b/net/bluetooth/af_bluetooth.c
+@@ -48,7 +48,6 @@
+ static struct net_proto_family *bt_proto[BT_MAX_PROTO];
+ static DEFINE_RWLOCK(bt_proto_lock);
+ 
+-#ifdef CONFIG_DEBUG_LOCK_ALLOC
+ static struct lock_class_key bt_lock_key[BT_MAX_PROTO];
+ static const char *bt_key_strings[BT_MAX_PROTO] = {
+ 	"sk_lock-AF_BLUETOOTH-BTPROTO_L2CAP",
+@@ -86,11 +85,6 @@ static inline void bt_sock_reclassify_lock(struct socket *sock, int proto)
+ 			bt_slock_key_strings[proto], &bt_slock_key[proto],
+ 				bt_key_strings[proto], &bt_lock_key[proto]);
+ }
+-#else
+-static inline void bt_sock_reclassify_lock(struct socket *sock, int proto)
+-{
+-}
+-#endif
+ 
+ int bt_sock_register(int proto, struct net_proto_family *ops)
+ {
+-- 
+1.7.0.4
+

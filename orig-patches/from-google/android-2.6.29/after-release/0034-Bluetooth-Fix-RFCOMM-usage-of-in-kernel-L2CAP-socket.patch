@@ -1,0 +1,46 @@
+From 4257744c5693bc10a79eeb9f27666983e8ebb7c1 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Tue, 17 Feb 2009 21:49:33 +0100
+Subject: [PATCH 034/247] Bluetooth: Fix RFCOMM usage of in-kernel L2CAP sockets
+
+The CID value of L2CAP sockets need to be set to zero. All userspace
+applications do this via memset() on the sockaddr_l2 structure. The
+RFCOMM implementation uses in-kernel L2CAP sockets and so it has to
+make sure that l2_cid is set to zero.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/rfcomm/core.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/net/bluetooth/rfcomm/core.c b/net/bluetooth/rfcomm/core.c
+index 5576c81..1d0fb0f 100644
+--- a/net/bluetooth/rfcomm/core.c
++++ b/net/bluetooth/rfcomm/core.c
+@@ -658,6 +658,7 @@ static struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst
+ 	bacpy(&addr.l2_bdaddr, src);
+ 	addr.l2_family = AF_BLUETOOTH;
+ 	addr.l2_psm    = 0;
++	addr.l2_cid    = 0;
+ 	*err = kernel_bind(sock, (struct sockaddr *) &addr, sizeof(addr));
+ 	if (*err < 0)
+ 		goto failed;
+@@ -679,6 +680,7 @@ static struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst
+ 	bacpy(&addr.l2_bdaddr, dst);
+ 	addr.l2_family = AF_BLUETOOTH;
+ 	addr.l2_psm    = htobs(RFCOMM_PSM);
++	addr.l2_cid    = 0;
+ 	*err = kernel_connect(sock, (struct sockaddr *) &addr, sizeof(addr), O_NONBLOCK);
+ 	if (*err == 0 || *err == -EINPROGRESS)
+ 		return s;
+@@ -1919,6 +1921,7 @@ static int rfcomm_add_listener(bdaddr_t *ba)
+ 	bacpy(&addr.l2_bdaddr, ba);
+ 	addr.l2_family = AF_BLUETOOTH;
+ 	addr.l2_psm    = htobs(RFCOMM_PSM);
++	addr.l2_cid    = 0;
+ 	err = kernel_bind(sock, (struct sockaddr *) &addr, sizeof(addr));
+ 	if (err < 0) {
+ 		BT_ERR("Bind failed %d", err);
+-- 
+1.7.0.4
+

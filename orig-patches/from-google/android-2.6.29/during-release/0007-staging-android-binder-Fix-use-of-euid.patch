@@ -1,0 +1,55 @@
+From 9279bcc31698842961a30bb05b00aef7236dd728 Mon Sep 17 00:00:00 2001
+From: J.R. Mauro <jrm8005@gmail.com>
+Date: Mon, 5 Jan 2009 17:08:53 -0500
+Subject: [PATCH 07/14] staging: android: binder: Fix use of euid
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Task credentials were moved and must be accessed through task_struct.cred
+
+Signed-off-by: J.R. Mauro <jrm8005@gmail.com>
+Cc: Arve Hjønnevåg <arve@android.com>
+Cc: Brian Swetland <swetland@google.com>
+Cc: Robert Love <rlove@google.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+---
+ drivers/staging/android/binder.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/staging/android/binder.c b/drivers/staging/android/binder.c
+index 765048e..7c3da5a 100644
+--- a/drivers/staging/android/binder.c
++++ b/drivers/staging/android/binder.c
+@@ -1401,7 +1401,7 @@ binder_transaction(struct binder_proc *proc, struct binder_thread *thread,
+ 		t->from = thread;
+ 	else
+ 		t->from = NULL;
+-	t->sender_euid = proc->tsk->euid;
++	t->sender_euid = proc->tsk->cred->euid;
+ 	t->to_proc = target_proc;
+ 	t->to_thread = target_thread;
+ 	t->code = tr->code;
+@@ -2593,16 +2593,16 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ 			goto err;
+ 		}
+ 		if (binder_context_mgr_uid != -1) {
+-			if (binder_context_mgr_uid != current->euid) {
++			if (binder_context_mgr_uid != current->cred->euid) {
+ 				printk(KERN_ERR "binder: BINDER_SET_"
+ 				       "CONTEXT_MGR bad uid %d != %d\n",
+-				       current->euid,
++				       current->cred->euid,
+ 				       binder_context_mgr_uid);
+ 				ret = -EPERM;
+ 				goto err;
+ 			}
+ 		} else
+-			binder_context_mgr_uid = current->euid;
++			binder_context_mgr_uid = current->cred->euid;
+ 		binder_context_mgr_node = binder_new_node(proc, NULL, NULL);
+ 		if (binder_context_mgr_node == NULL) {
+ 			ret = -ENOMEM;
+-- 
+1.7.0.4
+

@@ -1,0 +1,42 @@
+From 11fd1772d96736c065f722d6d8a5092f086be3f7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Mon, 27 Apr 2009 18:20:59 -0700
+Subject: [PATCH 119/247] ashmem: Don't install fault handler for private mmaps.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Ashmem is used to create named private heaps. If this heap is backed
+by a tmpfs file it will allocate two pages for every page touched.
+In 2.6.27, the extra page would later be freed, but 2.6.29 does not
+scan anonymous pages when running without swap so the memory is not
+freed while the file is referenced. This change changes the behavior
+of private ashmem mmaps to match /dev/zero instead tmpfs.
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+---
+ mm/ashmem.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
+
+diff --git a/mm/ashmem.c b/mm/ashmem.c
+index 96062cf..83ecd00 100644
+--- a/mm/ashmem.c
++++ b/mm/ashmem.c
+@@ -242,7 +242,13 @@ static int ashmem_mmap(struct file *file, struct vm_area_struct *vma)
+ 	}
+ 	get_file(asma->file);
+ 
+-	shmem_set_file(vma, asma->file);
++	if (vma->vm_flags & VM_SHARED)
++		shmem_set_file(vma, asma->file);
++	else {
++		if (vma->vm_file)
++			fput(vma->vm_file);
++		vma->vm_file = asma->file;
++	}
+ 	vma->vm_flags |= VM_CAN_NONLINEAR;
+ 
+ out:
+-- 
+1.7.0.4
+

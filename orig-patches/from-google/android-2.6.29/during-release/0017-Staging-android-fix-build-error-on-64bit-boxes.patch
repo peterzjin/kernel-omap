@@ -1,0 +1,36 @@
+From 07960058f0ce77ddc3027d3e45a5de1fb977334f Mon Sep 17 00:00:00 2001
+From: Greg Kroah-Hartman <gregkh@suse.de>
+Date: Wed, 28 Jan 2009 15:42:43 -0800
+Subject: [PATCH 17/19] Staging: android: fix build error on 64bit boxes
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+ktime_t isn't ment to directly access on all arches, so use the proper
+conversion functions instead to figure out what time is remaining.
+
+Reported-by: Randy Dunlap <randy.dunlap@oracle.com>
+Cc: Arve Hjønnevåg <arve@android.com>
+Cc: Mike Lockwood <lockwood@android.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+---
+ drivers/staging/android/timed_gpio.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/staging/android/timed_gpio.c b/drivers/staging/android/timed_gpio.c
+index b41b20e..903270c 100644
+--- a/drivers/staging/android/timed_gpio.c
++++ b/drivers/staging/android/timed_gpio.c
+@@ -49,7 +49,8 @@ static ssize_t gpio_enable_show(struct device *dev, struct device_attribute *att
+ 
+ 	if (hrtimer_active(&gpio_data->timer)) {
+ 		ktime_t r = hrtimer_get_remaining(&gpio_data->timer);
+-		remaining = r.tv.sec * 1000 + r.tv.nsec / 1000000;
++		struct timeval t = ktime_to_timeval(r);
++		remaining = t.tv_sec * 1000 + t.tv_usec;
+ 	} else
+ 		remaining = 0;
+ 
+-- 
+1.7.0.4
+

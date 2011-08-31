@@ -1,0 +1,76 @@
+From eca50df0292aaf54b7e91357e20728544b5413c1 Mon Sep 17 00:00:00 2001
+From: Nick Pelly <npelly@google.com>
+Date: Mon, 21 Sep 2009 17:52:19 -0700
+Subject: [PATCH 211/247] Revert "Bluetooth: Fix kernel panic while disconnecting RFCOMM"
+
+This reverts commit 6f505dbe5337e49302574f8d2e65fd83e30f9117.
+
+Unfortunately this fix did not address the unbalanced rfcomm_session_put()
+call, and panics during this disconnect sequence (with Moto H270)
+
+2009-09-21 17:22:37.384811 < ACL data: handle 1 flags 0x02 dlen 22
+   L2CAP(d): cid 0x0041 len 18 [psm 3]
+     RFCOMM(d): UIH: cr 0 dlci 20 pf 0 ilen 14 fcs 0xeb
+     0000: 0d 0a 2b 43 49 45 56 3a  20 37 2c 33 0d 0a        ..+CIEV: 7,3..
+2009-09-21 17:22:37.502273 > HCI Event: Number of Completed Packets
+(0x13) plen 5
+   handle 1 packets 1
+2009-09-21 17:22:37.788895 < ACL data: handle 1 flags 0x02 dlen 8
+   L2CAP(d): cid 0x0041 len 4 [psm 3]
+     RFCOMM(s): DISC: cr 0 dlci 20 pf 1 ilen 0 fcs 0x7d
+2009-09-21 17:22:37.906204 > HCI Event: Number of Completed Packets
+(0x13) plen 5
+   handle 1 packets 1
+2009-09-21 17:22:37.933090 > ACL data: handle 1 flags 0x02 dlen 8
+   L2CAP(d): cid 0x0040 len 4 [psm 3]
+     RFCOMM(s): UA: cr 0 dlci 20 pf 1 ilen 0 fcs 0x57
+2009-09-21 17:22:38.636764 < ACL data: handle 1 flags 0x02 dlen 8
+   L2CAP(d): cid 0x0041 len 4 [psm 3]
+     RFCOMM(s): DISC: cr 0 dlci 0 pf 1 ilen 0 fcs 0x9c
+2009-09-21 17:22:38.744125 > HCI Event: Number of Completed Packets
+(0x13) plen 5
+   handle 1 packets 1
+2009-09-21 17:22:38.763687 > ACL data: handle 1 flags 0x02 dlen 8
+   L2CAP(d): cid 0x0040 len 4 [psm 3]
+     RFCOMM(s): UA: cr 0 dlci 0 pf 1 ilen 0 fcs 0xb6
+2009-09-21 17:22:38.783554 > ACL data: handle 1 flags 0x02 dlen 12
+   L2CAP(s): Disconn req: dcid 0x0040 scid 0x0041
+2009-09-21 17:22:39.029526 < ACL data: handle 1 flags 0x02 dlen 12
+   L2CAP(s): Disconn rsp: dcid 0x0040 scid 0x0041
+2009-09-21 17:22:39.136581 > HCI Event: Number of Completed Packets
+(0x13) plen 5
+   handle 1 packets 1
+2009-09-21 17:22:41.337203 > HCI Event: Disconn Complete (0x05) plen 4
+   status 0x00 handle 1 reason 0x13
+   Reason: Remote User Terminated Connection
+
+Signed-off-by: Nick Pelly <npelly@google.com>
+---
+ net/bluetooth/rfcomm/core.c |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
+
+diff --git a/net/bluetooth/rfcomm/core.c b/net/bluetooth/rfcomm/core.c
+index 5d66c1f..c109a3a 100644
+--- a/net/bluetooth/rfcomm/core.c
++++ b/net/bluetooth/rfcomm/core.c
+@@ -1795,8 +1795,6 @@ static inline void rfcomm_process_rx(struct rfcomm_session *s)
+ 
+ 	BT_DBG("session %p state %ld qlen %d", s, s->state, skb_queue_len(&sk->sk_receive_queue));
+ 
+-	rfcomm_session_hold(s);
+-
+ 	/* Get data directly from socket receive queue without copying it. */
+ 	while ((skb = skb_dequeue(&sk->sk_receive_queue))) {
+ 		skb_orphan(skb);
+@@ -1809,8 +1807,6 @@ static inline void rfcomm_process_rx(struct rfcomm_session *s)
+ 
+ 		rfcomm_session_close(s, sk->sk_err);
+ 	}
+-
+-	rfcomm_session_put(s);
+ }
+ 
+ static inline void rfcomm_accept_connection(struct rfcomm_session *s)
+-- 
+1.7.0.4
+

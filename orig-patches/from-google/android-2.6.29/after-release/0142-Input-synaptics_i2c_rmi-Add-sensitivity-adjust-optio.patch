@@ -1,0 +1,61 @@
+From 2a354fe9ebeffb92f3d5ba3a9a95294b6e2aec83 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Tue, 14 Jul 2009 20:51:49 -0700
+Subject: [PATCH 142/247] Input: synaptics_i2c_rmi: Add sensitivity adjust option.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+---
+ drivers/input/touchscreen/synaptics_i2c_rmi.c |    7 +++++++
+ include/linux/synaptics_i2c_rmi.h             |    1 +
+ 2 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/input/touchscreen/synaptics_i2c_rmi.c b/drivers/input/touchscreen/synaptics_i2c_rmi.c
+index 4ad4cc9..56cf371 100644
+--- a/drivers/input/touchscreen/synaptics_i2c_rmi.c
++++ b/drivers/input/touchscreen/synaptics_i2c_rmi.c
+@@ -43,6 +43,7 @@ struct synaptics_ts_data {
+ 	int snap_down[2];
+ 	int snap_up[2];
+ 	uint32_t flags;
++	int8_t sensitivity_adjust;
+ 	int (*power)(int on);
+ 	struct early_suspend early_suspend;
+ };
+@@ -65,6 +66,11 @@ static int synaptics_init_panel(struct synaptics_ts_data *ts)
+ 	if (ret < 0)
+ 		printk(KERN_ERR "i2c_smbus_write_byte_data failed for No Clip Z\n");
+ 
++	ret = i2c_smbus_write_byte_data(ts->client, 0x44,
++					ts->sensitivity_adjust);
++	if (ret < 0)
++		pr_err("synaptics_ts: failed to set Sensitivity Adjust\n");
++
+ err_page_select_failed:
+ 	ret = i2c_smbus_write_byte_data(ts->client, 0xff, 0x04); /* page select = 0x04 */
+ 	if (ret < 0)
+@@ -316,6 +322,7 @@ static int synaptics_ts_probe(
+ 		while (pdata->version > panel_version)
+ 			pdata++;
+ 		ts->flags = pdata->flags;
++		ts->sensitivity_adjust = pdata->sensitivity_adjust;
+ 		inactive_area_left = pdata->inactive_left;
+ 		inactive_area_right = pdata->inactive_right;
+ 		inactive_area_top = pdata->inactive_top;
+diff --git a/include/linux/synaptics_i2c_rmi.h b/include/linux/synaptics_i2c_rmi.h
+index ca51b2f..0e40703 100644
+--- a/include/linux/synaptics_i2c_rmi.h
++++ b/include/linux/synaptics_i2c_rmi.h
+@@ -48,6 +48,7 @@ struct synaptics_i2c_rmi_platform_data {
+ 	uint32_t fuzz_y; /* 0x10000 = screen height */
+ 	int fuzz_p;
+ 	int fuzz_w;
++	int8_t sensitivity_adjust;
+ };
+ 
+ #endif /* _LINUX_SYNAPTICS_I2C_RMI_H */
+-- 
+1.7.0.4
+

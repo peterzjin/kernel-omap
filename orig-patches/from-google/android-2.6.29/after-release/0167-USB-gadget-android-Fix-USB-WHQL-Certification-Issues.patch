@@ -1,0 +1,79 @@
+From 85269242fdfab1937f7417da8e8fd7864501f9bc Mon Sep 17 00:00:00 2001
+From: Jared Suttles <jared.suttles@motorola.com>
+Date: Fri, 7 Aug 2009 18:57:49 -0500
+Subject: [PATCH 167/247] USB: gadget: android: Fix USB WHQL Certification Issues
+
+Submitted on behalf of RaviKumar Vembu <ravi.v@motorola.com>
+Signed-off-by: Jared Suttles <jared.suttles@motorola.com>
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/android.c        |    3 ---
+ drivers/usb/gadget/f_mass_storage.c |   13 +++++--------
+ 2 files changed, 5 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/usb/gadget/android.c b/drivers/usb/gadget/android.c
+index 2c175b0..d3c028d 100644
+--- a/drivers/usb/gadget/android.c
++++ b/drivers/usb/gadget/android.c
+@@ -173,9 +173,6 @@ static int __init android_bind(struct usb_composite_dev *cdev)
+ 	strings_dev[STRING_SERIAL_IDX].id = id;
+ 	device_desc.iSerialNumber = id;
+ 
+-	if (gadget->ops->wakeup)
+-		android_config_driver.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+-
+ 	/* register our configuration */
+ 	ret = usb_add_config(cdev, &android_config_driver);
+ 	if (ret) {
+diff --git a/drivers/usb/gadget/f_mass_storage.c b/drivers/usb/gadget/f_mass_storage.c
+index 5e9e2a0..d3a70b2 100644
+--- a/drivers/usb/gadget/f_mass_storage.c
++++ b/drivers/usb/gadget/f_mass_storage.c
+@@ -2234,18 +2234,11 @@ static int do_set_config(struct fsg_dev *fsg, u8 new_config)
+ 	if (fsg->config != 0) {
+ 		DBG(fsg, "reset config\n");
+ 		fsg->config = 0;
+-		rc = do_set_interface(fsg, -1);
+ 	}
+ 
+ 	/* Enable the interface */
+-	if (new_config != 0) {
++	if (new_config != 0)
+ 		fsg->config = new_config;
+-		rc = do_set_interface(fsg, 0);
+-		if (rc != 0)
+-			fsg->config = 0;	/* Reset on errors */
+-		else
+-			INFO(fsg, "config #%d\n", fsg->config);
+-	}
+ 
+ 	switch_set_state(&fsg->sdev, new_config);
+ 	adjust_wake_lock(fsg);
+@@ -2344,6 +2337,7 @@ static void handle_exception(struct fsg_dev *fsg)
+ 
+ 	case FSG_STATE_EXIT:
+ 	case FSG_STATE_TERMINATED:
++		do_set_interface(fsg, -1);
+ 		do_set_config(fsg, 0);			/* Free resources */
+ 		spin_lock_irq(&fsg->lock);
+ 		fsg->state = FSG_STATE_TERMINATED;	/* Stop the thread */
+@@ -2842,6 +2836,7 @@ static int fsg_function_set_alt(struct usb_function *f,
+ 	struct fsg_dev	*fsg = func_to_dev(f);
+ 	DBG(fsg, "fsg_function_set_alt intf: %d alt: %d\n", intf, alt);
+ 	fsg->new_config = 1;
++	do_set_interface(fsg, 0);
+ 	raise_exception(fsg, FSG_STATE_CONFIG_CHANGE);
+ 	return 0;
+ }
+@@ -2850,6 +2845,8 @@ static void fsg_function_disable(struct usb_function *f)
+ {
+ 	struct fsg_dev	*fsg = func_to_dev(f);
+ 	DBG(fsg, "fsg_function_disable\n");
++	if (fsg->new_config)
++		do_set_interface(fsg, -1);
+ 	fsg->new_config = 0;
+ 	raise_exception(fsg, FSG_STATE_CONFIG_CHANGE);
+ }
+-- 
+1.7.0.4
+

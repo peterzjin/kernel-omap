@@ -1,0 +1,73 @@
+From 148eb4f6fa79d95c3a76808c25f86ee88f1e55ab Mon Sep 17 00:00:00 2001
+From: Mike Chan <mikechan@google.com>
+Date: Thu, 24 Apr 2008 10:22:26 -0700
+Subject: [PATCH 085/247] Grants system server access to /proc/<pid>/oom_adj for Android applications.
+
+Signed-off-by: Brian Swetland <swetland@google.com>
+---
+ fs/proc/base.c |   35 ++++++++++++++++++++++++++++++++++-
+ 1 files changed, 34 insertions(+), 1 deletions(-)
+
+diff --git a/fs/proc/base.c b/fs/proc/base.c
+index beaa0ce..93d926c 100644
+--- a/fs/proc/base.c
++++ b/fs/proc/base.c
+@@ -127,6 +127,12 @@ struct pid_entry {
+ 		NULL, &proc_single_file_operations,	\
+ 		{ .proc_show = show } )
+ 
++/* ANDROID is for special files in /proc. */
++#define ANDROID(NAME, MODE, OTYPE)			\
++	NOD(NAME, (S_IFREG|(MODE)),			\
++		&proc_##OTYPE##_inode_operations,	\
++		&proc_##OTYPE##_operations, {})
++
+ /*
+  * Count the number of hardlinks for the pid_entry table, excluding the .
+  * and .. links.
+@@ -1060,6 +1066,33 @@ static ssize_t oom_adjust_write(struct file *file, const char __user *buf,
+ 	return end - buffer;
+ }
+ 
++static int oom_adjust_permission(struct inode *inode, int mask)
++{
++	uid_t uid;
++	struct task_struct *p = get_proc_task(inode);
++	if(p) {
++		uid = task_uid(p);
++		put_task_struct(p);
++	}
++
++	/*
++	 * System Server (uid == 1000) is granted access to oom_adj of all 
++	 * android applications (uid > 10000) as and services (uid >= 1000)
++	 */
++	if (p && (current_fsuid() == 1000) && (uid >= 1000)) {
++		if (inode->i_mode >> 6 & mask) {
++			return 0;
++		}
++	}
++
++	/* Fall back to default. */
++	return generic_permission(inode, mask, NULL);
++}
++
++static const struct inode_operations proc_oom_adjust_inode_operations = {
++	.permission	= oom_adjust_permission,
++};
++
+ static const struct file_operations proc_oom_adjust_operations = {
+ 	.read		= oom_adjust_read,
+ 	.write		= oom_adjust_write,
+@@ -2542,7 +2575,7 @@ static const struct pid_entry tgid_base_stuff[] = {
+ 	REG("cgroup",  S_IRUGO, proc_cgroup_operations),
+ #endif
+ 	INF("oom_score",  S_IRUGO, proc_oom_score),
+-	REG("oom_adj",    S_IRUGO|S_IWUSR, proc_oom_adjust_operations),
++	ANDROID("oom_adj",S_IRUGO|S_IWUSR, oom_adjust),
+ #ifdef CONFIG_AUDITSYSCALL
+ 	REG("loginuid",   S_IWUSR|S_IRUGO, proc_loginuid_operations),
+ 	REG("sessionid",  S_IRUGO, proc_sessionid_operations),
+-- 
+1.7.0.4
+

@@ -1,0 +1,62 @@
+From 5b1e81e05f98019eb10b80e7cc14f21a9b2906dc Mon Sep 17 00:00:00 2001
+From: Martin Fuzzey <mfuzzey@gmail.com>
+Date: Mon, 1 Jun 2009 09:19:37 +0100
+Subject: [PATCH 226/247] [ARM] 5534/1: kmalloc must return a cache line aligned buffer
+
+Define ARCH_KMALLOC_MINALIGN in asm/cache.h
+At the request of Russell also move ARCH_SLAB_MINALIGN to this file.
+
+Signed-off-by: Martin Fuzzey <mfuzzey@gmail.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+(cherry picked from commit eb5f4ca9536ba297c98721ecbbdf41ec5b987bd5)
+---
+ arch/arm/include/asm/cache.h |   16 ++++++++++++++++
+ arch/arm/include/asm/page.h  |    7 -------
+ 2 files changed, 16 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/include/asm/cache.h b/arch/arm/include/asm/cache.h
+index 84778c1..66c160b 100644
+--- a/arch/arm/include/asm/cache.h
++++ b/arch/arm/include/asm/cache.h
+@@ -7,4 +7,20 @@
+ #define L1_CACHE_SHIFT		CONFIG_ARM_L1_CACHE_SHIFT
+ #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+ 
++/*
++ * Memory returned by kmalloc() may be used for DMA, so we must make
++ * sure that all such allocations are cache aligned. Otherwise,
++ * unrelated code may cause parts of the buffer to be read into the
++ * cache before the transfer is done, causing old data to be seen by
++ * the CPU.
++ */
++#define ARCH_KMALLOC_MINALIGN	L1_CACHE_BYTES
++
++/*
++ * With EABI on ARMv5 and above we must have 64-bit aligned slab pointers.
++ */
++#if defined(CONFIG_AEABI) && (__LINUX_ARM_ARCH__ >= 5)
++#define ARCH_SLAB_MINALIGN 8
++#endif
++
+ #endif
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index f341c9d..1c75656 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -194,13 +194,6 @@ typedef struct page *pgtable_t;
+ 	(((current->personality & READ_IMPLIES_EXEC) ? VM_EXEC : 0) | \
+ 	 VM_READ | VM_WRITE | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+ 
+-/*
+- * With EABI on ARMv5 and above we must have 64-bit aligned slab pointers.
+- */
+-#if defined(CONFIG_AEABI) && (__LINUX_ARM_ARCH__ >= 5)
+-#define ARCH_SLAB_MINALIGN 8
+-#endif
+-
+ #include <asm-generic/page.h>
+ 
+ #endif
+-- 
+1.7.0.4
+

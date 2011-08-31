@@ -1,0 +1,63 @@
+From d7b0b2043bd9bc5f15bf9a677d59d0d87dd045c2 Mon Sep 17 00:00:00 2001
+From: Mike Lockwood <lockwood@android.com>
+Date: Tue, 21 Jul 2009 12:41:47 -0400
+Subject: [PATCH 139/247] usb gadget: android: Add helper function for usb_gadget_connect and disconnect.
+
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/android.c |   13 +++++++++++--
+ include/linux/usb/android.h  |    2 ++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/gadget/android.c b/drivers/usb/gadget/android.c
+index e763524..2c175b0 100644
+--- a/drivers/usb/gadget/android.c
++++ b/drivers/usb/gadget/android.c
+@@ -63,7 +63,6 @@ static const char longname[] = "Gadget Android";
+ #define ADB_PRODUCT_ID	0x0002
+ 
+ struct android_dev {
+-	struct usb_gadget *gadget;
+ 	struct usb_composite_dev *cdev;
+ 
+ 	int product_id;
+@@ -113,6 +112,16 @@ static struct usb_device_descriptor device_desc = {
+ 	.bNumConfigurations   = 1,
+ };
+ 
++void android_usb_set_connected(int connected)
++{
++	if (_android_dev && _android_dev->cdev && _android_dev->cdev->gadget) {
++		if (connected)
++			usb_gadget_connect(_android_dev->cdev->gadget);
++		else
++			usb_gadget_disconnect(_android_dev->cdev->gadget);
++	}
++}
++
+ static int __init android_bind_config(struct usb_configuration *c)
+ {
+ 	struct android_dev *dev = _android_dev;
+@@ -250,7 +259,7 @@ static int adb_enable_release(struct inode *ip, struct file *fp)
+ 	return 0;
+ }
+ 
+-static struct file_operations adb_enable_fops = {
++static const struct file_operations adb_enable_fops = {
+ 	.owner =   THIS_MODULE,
+ 	.open =    adb_enable_open,
+ 	.release = adb_enable_release,
+diff --git a/include/linux/usb/android.h b/include/linux/usb/android.h
+index 1a5def2..bf9dfe7 100644
+--- a/include/linux/usb/android.h
++++ b/include/linux/usb/android.h
+@@ -37,4 +37,6 @@ struct android_usb_platform_data {
+ 	int nluns;
+ };
+ 
++extern void android_usb_set_connected(int on);
++
+ #endif	/* __LINUX_USB_ANDROID_H */
+-- 
+1.7.0.4
+

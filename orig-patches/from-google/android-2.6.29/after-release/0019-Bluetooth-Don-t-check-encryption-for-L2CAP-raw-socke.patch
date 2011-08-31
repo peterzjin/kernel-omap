@@ -1,0 +1,35 @@
+From 56e101827e98fab47d7671f712ef3505a5c22f4b Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Wed, 4 Feb 2009 21:07:19 +0100
+Subject: [PATCH 019/247] Bluetooth: Don't check encryption for L2CAP raw sockets
+
+For L2CAP sockets with medium and high security requirement a missing
+encryption will enforce the closing of the link. For the L2CAP raw
+sockets this is not needed, so skip that check.
+
+This fixes a crash when pairing Bluetooth 2.0 (and earlier) devices
+since the L2CAP state machine got confused and then locked up the whole
+system.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/l2cap.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/net/bluetooth/l2cap.c b/net/bluetooth/l2cap.c
+index 71a064f..b677af6 100644
+--- a/net/bluetooth/l2cap.c
++++ b/net/bluetooth/l2cap.c
+@@ -2420,6 +2420,9 @@ static int l2cap_disconn_ind(struct hci_conn *hcon, u8 reason)
+ 
+ static inline void l2cap_check_encryption(struct sock *sk, u8 encrypt)
+ {
++	if (sk->sk_type != SOCK_SEQPACKET)
++		return;
++
+ 	if (encrypt == 0x00) {
+ 		if (l2cap_pi(sk)->sec_level == BT_SECURITY_MEDIUM) {
+ 			l2cap_sock_clear_timer(sk);
+-- 
+1.7.0.4
+

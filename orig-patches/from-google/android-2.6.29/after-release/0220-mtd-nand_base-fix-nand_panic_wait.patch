@@ -1,0 +1,39 @@
+From ac716cdc1d50366f6d628a6d9cb6d8cb9f91dffe Mon Sep 17 00:00:00 2001
+From: Tom Zhu <a2289c@android-hal-04.(none)>
+Date: Sat, 3 Oct 2009 18:50:04 -0500
+Subject: [PATCH 220/247] mtd: nand_base: fix nand_panic_wait
+
+fix the problem of nand_panic_wait
+
+Signed-off-by: Tom Zhu <a2289c@android-hal-04.(none)>
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/mtd/nand/nand_base.c |   12 +++++++-----
+ 1 files changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index 8ba3e3e..8d6d033 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -2524,11 +2524,13 @@ static void nand_panic_wait(struct mtd_info *mtd)
+ 	struct nand_chip *chip = mtd->priv;
+ 	int i;
+ 
+-	for (i = 0; i < 2000; i++) {
+-		if (chip->dev_ready(mtd))
+-			break;
+-		mdelay(10);
+-	}
++	if (chip->state != FL_READY)
++		for (i = 0; i < 40; i++) {
++			if (chip->dev_ready(mtd))
++				break;
++			mdelay(10);
++		}
++	chip->state = FL_READY;
+ }
+ 
+ static int nand_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
+-- 
+1.7.0.4
+

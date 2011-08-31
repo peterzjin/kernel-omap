@@ -1,0 +1,53 @@
+From a8f0f7b5ffca47aff3df17fd61447bac0ab99cbb Mon Sep 17 00:00:00 2001
+From: Mike Lockwood <lockwood@android.com>
+Date: Fri, 21 Aug 2009 10:54:39 -0400
+Subject: [PATCH 184/247] drivers: usb: gadget: Use usb_mass_storage platform device as parent for lun
+
+If a platform device is specified for the f_mass_storage function, use it as the
+parent driver for the lun files in sysfs.
+This allows a platform independent file path for controlling USB mass storage
+from user space.
+
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/f_mass_storage.c |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/usb/gadget/f_mass_storage.c b/drivers/usb/gadget/f_mass_storage.c
+index 169ea59..86b128c 100644
+--- a/drivers/usb/gadget/f_mass_storage.c
++++ b/drivers/usb/gadget/f_mass_storage.c
+@@ -304,6 +304,9 @@ struct fsg_dev {
+ 	struct usb_function function;
+ 	struct usb_composite_dev *cdev;
+ 
++	/* optional "usb_mass_storage" platform device */
++	struct platform_device *pdev;
++
+ 	/* lock protects: state and all the req_busy's */
+ 	spinlock_t		lock;
+ 
+@@ -2723,7 +2726,11 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
+ 		curlun = &fsg->luns[i];
+ 		curlun->ro = 0;
+ 		curlun->dev.release = lun_release;
+-		curlun->dev.parent = &cdev->gadget->dev;
++		/* use "usb_mass_storage" platform device as parent if available */
++		if (fsg->pdev)
++			curlun->dev.parent = &fsg->pdev->dev;
++		else
++			curlun->dev.parent = &cdev->gadget->dev;
+ 		dev_set_drvdata(&curlun->dev, fsg);
+ 		snprintf(curlun->dev.bus_id, BUS_ID_SIZE,
+ 				"lun%d", i);
+@@ -2858,6 +2865,7 @@ static int __init fsg_probe(struct platform_device *pdev)
+ 	struct usb_mass_storage_platform_data *pdata = pdev->dev.platform_data;
+ 	struct fsg_dev *fsg = the_fsg;
+ 
++	fsg->pdev = pdev;
+ 	printk(KERN_INFO "fsg_probe pdata: %p\n", pdata);
+ 
+ 	if (pdata) {
+-- 
+1.7.0.4
+

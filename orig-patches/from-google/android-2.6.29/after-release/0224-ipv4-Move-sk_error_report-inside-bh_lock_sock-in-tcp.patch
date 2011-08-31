@@ -1,0 +1,42 @@
+From 35f3f7d1fcee9a695407165de9cfc88da06244e0 Mon Sep 17 00:00:00 2001
+From: Colin Cross <ccross@android.com>
+Date: Fri, 23 Oct 2009 12:06:42 -0700
+Subject: [PATCH 224/247] ipv4: Move sk_error_report inside bh_lock_sock in tcp_v4_nuke_addr
+
+When sk_error_report is called, it wakes up the user-space thread, which then
+calls tcp_close.  When the tcp_close is interrupted by the tcp_v4_nuke_addr
+ioctl thread running tcp_done, it leaks 392 bytes and triggers a WARN_ON.
+
+This patch moves the call to sk_error_report inside the bh_lock_sock, which
+matches the locking used in tcp_v4_err.
+
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ net/ipv4/tcp_ipv4.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/net/ipv4/tcp_ipv4.c b/net/ipv4/tcp_ipv4.c
+index 87696dc..9fd7221 100644
+--- a/net/ipv4/tcp_ipv4.c
++++ b/net/ipv4/tcp_ipv4.c
+@@ -1877,14 +1877,14 @@ restart:
+ 			if (sock_flag(sk, SOCK_DEAD))
+ 				continue;
+ 
+-			sk->sk_err = ETIMEDOUT;
+-			sk->sk_error_report(sk);
+-
+ 			sock_hold(sk);
+ 			spin_unlock_bh(lock);
+ 
+ 			local_bh_disable();
+ 			bh_lock_sock(sk);
++			sk->sk_err = ETIMEDOUT;
++			sk->sk_error_report(sk);
++
+ 			tcp_done(sk);
+ 			bh_unlock_sock(sk);
+ 			local_bh_enable();
+-- 
+1.7.0.4
+

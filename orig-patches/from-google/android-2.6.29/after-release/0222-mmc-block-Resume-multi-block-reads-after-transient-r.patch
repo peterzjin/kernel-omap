@@ -1,0 +1,28 @@
+From bd5b3e225427acd3e6b241d79ea7236eaa7bbc59 Mon Sep 17 00:00:00 2001
+From: David Ding <david.j.ding@motorola.com>
+Date: Fri, 9 Oct 2009 06:38:10 -0700
+Subject: [PATCH 222/247] mmc: block: Resume multi-block reads after transient read errors.
+
+Signed-off-by: Bentao Zou <bzou1@motorola.com>
+Signed-off-by: David Ding <david.j.ding@motorola.com>
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/mmc/card/block.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 92e2862..c3d8481 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -378,6 +378,8 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
+ 				continue;
+ 			}
+ 			status = get_card_status(card, req);
++		} else if (disable_multi == 1) {
++			disable_multi = 0;
+ 		}
+ 
+ 		if (brq.cmd.error) {
+-- 
+1.7.0.4
+

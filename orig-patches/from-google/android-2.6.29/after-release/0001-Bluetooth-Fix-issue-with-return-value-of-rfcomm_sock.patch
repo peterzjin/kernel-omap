@@ -1,0 +1,34 @@
+From 1e951d9a72d81fa8eff13ff3b0eb0da2d012b999 Mon Sep 17 00:00:00 2001
+From: Victor Shcherbatyuk <victor.shcherbatyuk@tomtom.com>
+Date: Thu, 15 Jan 2009 21:52:12 +0100
+Subject: [PATCH 001/247] Bluetooth: Fix issue with return value of rfcomm_sock_sendmsg()
+
+In case of connection failures the rfcomm_sock_sendmsg() should return
+an error and not a 0 value.
+
+Signed-off-by: Victor Shcherbatyuk <victor.shcherbatyuk@tomtom.com>
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/rfcomm/sock.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/net/bluetooth/rfcomm/sock.c b/net/bluetooth/rfcomm/sock.c
+index d3fc6fc..ce505f2 100644
+--- a/net/bluetooth/rfcomm/sock.c
++++ b/net/bluetooth/rfcomm/sock.c
+@@ -570,8 +570,11 @@ static int rfcomm_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
+ 
+ 		skb = sock_alloc_send_skb(sk, size + RFCOMM_SKB_RESERVE,
+ 				msg->msg_flags & MSG_DONTWAIT, &err);
+-		if (!skb)
++		if (!skb) {
++			if (sent == 0)
++				sent = err;
+ 			break;
++		}
+ 		skb_reserve(skb, RFCOMM_SKB_HEAD_RESERVE);
+ 
+ 		err = memcpy_fromiovec(skb_put(skb, size), msg->msg_iov, size);
+-- 
+1.7.0.4
+

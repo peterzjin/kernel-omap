@@ -1,0 +1,69 @@
+From 0d8750c3bfd8b6240ff663e7b1bd70ef92fbacfc Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Tue, 9 Jun 2009 20:21:44 -0700
+Subject: [PATCH 127/247] futex: Restore one of the fast paths eliminated by 38d47c1b7075bd7ec3881141bb3629da58f88dab
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This improves futex performance until our user-space code is fixed to use
+FUTEX_PRIVATE_FLAG for non-shared futexes.
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+---
+ kernel/futex.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
+
+diff --git a/kernel/futex.c b/kernel/futex.c
+index 438701a..9011c7c 100644
+--- a/kernel/futex.c
++++ b/kernel/futex.c
+@@ -210,6 +210,7 @@ static int get_futex_key(u32 __user *uaddr, int fshared, union futex_key *key)
+ 	struct mm_struct *mm = current->mm;
+ 	struct page *page;
+ 	int err;
++	struct vm_area_struct *vma;
+ 
+ 	/*
+ 	 * The futex address must be "naturally" aligned.
+@@ -235,6 +236,37 @@ static int get_futex_key(u32 __user *uaddr, int fshared, union futex_key *key)
+ 		return 0;
+ 	}
+ 
++	/*
++	 * The futex is hashed differently depending on whether
++	 * it's in a shared or private mapping.  So check vma first.
++	 */
++	vma = find_extend_vma(mm, address);
++	if (unlikely(!vma))
++		return -EFAULT;
++
++	/*
++	 * Permissions.
++	 */
++	if (unlikely((vma->vm_flags & (VM_IO|VM_READ)) != VM_READ))
++		return (vma->vm_flags & VM_IO) ? -EPERM : -EACCES;
++
++	/*
++	 * Private mappings are handled in a simple way.
++	 *
++	 * NOTE: When userspace waits on a MAP_SHARED mapping, even if
++	 * it's a read-only handle, it's expected that futexes attach to
++	 * the object not the particular process.  Therefore we use
++	 * VM_MAYSHARE here, not VM_SHARED which is restricted to shared
++	 * mappings of _writable_ handles.
++	 */
++	if (likely(!(vma->vm_flags & VM_MAYSHARE))) {
++		key->both.offset |= FUT_OFF_MMSHARED; /* reference taken on mm */
++		key->private.mm = mm;
++		key->private.address = address;
++		get_futex_key_refs(key);
++		return 0;
++	}
++
+ again:
+ 	err = get_user_pages_fast(address, 1, 0, &page);
+ 	if (err < 0)
+-- 
+1.7.0.4
+

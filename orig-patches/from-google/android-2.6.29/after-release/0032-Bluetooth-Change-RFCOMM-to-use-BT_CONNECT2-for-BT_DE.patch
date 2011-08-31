@@ -1,0 +1,54 @@
+From fd67941498eddc17fbb39e09a99e28cedbedc69a Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Mon, 16 Feb 2009 02:59:49 +0100
+Subject: [PATCH 032/247] Bluetooth: Change RFCOMM to use BT_CONNECT2 for BT_DEFER_SETUP
+
+When BT_DEFER_SETUP is enabled on a RFCOMM socket, then switch its
+current state from BT_OPEN to BT_CONNECT2. This gives the Bluetooth
+core a unified way to handle L2CAP and RFCOMM sockets. The BT_CONNECT2
+state is designated for incoming connections.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/rfcomm/core.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git a/net/bluetooth/rfcomm/core.c b/net/bluetooth/rfcomm/core.c
+index 1828ec0..5576c81 100644
+--- a/net/bluetooth/rfcomm/core.c
++++ b/net/bluetooth/rfcomm/core.c
+@@ -448,6 +448,7 @@ static int __rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
+ 		break;
+ 
+ 	case BT_OPEN:
++	case BT_CONNECT2:
+ 		if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
+ 			set_bit(RFCOMM_AUTH_REJECT, &d->flags);
+ 			rfcomm_schedule(RFCOMM_SCHED_AUTH);
+@@ -1208,6 +1209,11 @@ static void rfcomm_check_accept(struct rfcomm_dlc *d)
+ 		if (d->defer_setup) {
+ 			set_bit(RFCOMM_DEFER_SETUP, &d->flags);
+ 			rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
++
++			rfcomm_dlc_lock(d);
++			d->state = BT_CONNECT2;
++			d->state_change(d, 0);
++			rfcomm_dlc_unlock(d);
+ 		} else
+ 			rfcomm_dlc_accept(d);
+ 	} else {
+@@ -1749,6 +1755,11 @@ static inline void rfcomm_process_dlcs(struct rfcomm_session *s)
+ 				if (d->defer_setup) {
+ 					set_bit(RFCOMM_DEFER_SETUP, &d->flags);
+ 					rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
++
++					rfcomm_dlc_lock(d);
++					d->state = BT_CONNECT2;
++					d->state_change(d, 0);
++					rfcomm_dlc_unlock(d);
+ 				} else
+ 					rfcomm_dlc_accept(d);
+ 			}
+-- 
+1.7.0.4
+

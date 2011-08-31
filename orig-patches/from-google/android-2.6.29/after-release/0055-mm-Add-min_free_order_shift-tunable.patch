@@ -1,0 +1,69 @@
+From d620f695290e4ffb1586420ba1dbbb5b2c8c075d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?= <arve@android.com>
+Date: Tue, 17 Feb 2009 14:51:02 -0800
+Subject: [PATCH 055/247] mm: Add min_free_order_shift tunable.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+By default the kernel tries to keep half as much memory free at each
+order as it does for one order below. This can be too agressive when
+running without swap.
+
+Signed-off-by: Arve Hjønnevåg <arve@android.com>
+---
+ kernel/sysctl.c |    9 +++++++++
+ mm/page_alloc.c |    3 ++-
+ 2 files changed, 11 insertions(+), 1 deletions(-)
+
+diff --git a/kernel/sysctl.c b/kernel/sysctl.c
+index c5ef44f..0e3d9aa 100644
+--- a/kernel/sysctl.c
++++ b/kernel/sysctl.c
+@@ -76,6 +76,7 @@ extern int suid_dumpable;
+ extern char core_pattern[];
+ extern int pid_max;
+ extern int min_free_kbytes;
++extern int min_free_order_shift;
+ extern int pid_max_min, pid_max_max;
+ extern int sysctl_drop_caches;
+ extern int percpu_pagelist_fraction;
+@@ -1097,6 +1098,14 @@ static struct ctl_table vm_table[] = {
+ 		.extra1		= &zero,
+ 	},
+ 	{
++		.ctl_name	= CTL_UNNUMBERED,
++		.procname	= "min_free_order_shift",
++		.data		= &min_free_order_shift,
++		.maxlen		= sizeof(min_free_order_shift),
++		.mode		= 0644,
++		.proc_handler	= &proc_dointvec
++	},
++	{
+ 		.ctl_name	= VM_PERCPU_PAGELIST_FRACTION,
+ 		.procname	= "percpu_pagelist_fraction",
+ 		.data		= &percpu_pagelist_fraction,
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 5c44ed4..a596bfd 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -119,6 +119,7 @@ static char * const zone_names[MAX_NR_ZONES] = {
+ };
+ 
+ int min_free_kbytes = 1024;
++int min_free_order_shift = 1;
+ 
+ unsigned long __meminitdata nr_kernel_pages;
+ unsigned long __meminitdata nr_all_pages;
+@@ -1256,7 +1257,7 @@ int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
+ 		free_pages -= z->free_area[o].nr_free << o;
+ 
+ 		/* Require fewer higher order pages to be free */
+-		min >>= 1;
++		min >>= min_free_order_shift;
+ 
+ 		if (free_pages <= min)
+ 			return 0;
+-- 
+1.7.0.4
+

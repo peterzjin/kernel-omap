@@ -1,0 +1,44 @@
+From b57ea61c2cc752e991ac7aaf803acfea0f29d288 Mon Sep 17 00:00:00 2001
+From: Robert Love <rlove@google.com>
+Date: Thu, 8 Oct 2009 15:06:22 -0400
+Subject: [PATCH 221/247] net: ipv4: Fix race in tcp_v4_nuke_addr().
+
+To fix a recursive deadlock in 2.6.29, we stopped holding the hash table lock
+across tcp_done() calls. This fixed the deadlock, but introduced a race where
+the socket could die or change state.
+
+Fix: Before unlocking the hash table, we grab a reference to the socket. We
+can then unlock the hash table without risk of the socket going away. We then
+lock the socket, which is safe because it is pinned. We can then call
+tcp_done() without recursive deadlock and without race. Upon return, we unlock
+the socket and then unpin it, killing it.
+
+Change-Id: Idcdae072b48238b01bdbc8823b60310f1976e045
+Signed-off-by: Robert Love <rlove@google.com>
+Acked-by: Dima Zavin <dima@android.com>
+---
+ net/ipv4/tcp_ipv4.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/net/ipv4/tcp_ipv4.c b/net/ipv4/tcp_ipv4.c
+index b04e5ad..ad0463d 100644
+--- a/net/ipv4/tcp_ipv4.c
++++ b/net/ipv4/tcp_ipv4.c
+@@ -1879,8 +1879,14 @@ restart:
+ 
+ 			sk->sk_err = ETIMEDOUT;
+ 			sk->sk_error_report(sk);
++
++			sock_hold(sk);
+ 			spin_unlock_bh(lock);
++			bh_lock_sock(sk);
+ 			tcp_done(sk);
++			bh_unlock_sock(sk);
++			sock_put(sk);
++
+ 			goto restart;
+ 		}
+ 		spin_unlock_bh(lock);
+-- 
+1.7.0.4
+

@@ -1,0 +1,149 @@
+From aba8ceb77e42f273710a0ff88b6afbb87b1ade59 Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Mon, 9 Feb 2009 02:48:38 +0100
+Subject: [PATCH 021/247] Bluetooth: Use general bonding whenever possible
+
+When receiving incoming connection to specific services, always use
+general bonding. This ensures that the link key gets stored and can be
+used for further authentications.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ include/net/bluetooth/hci_core.h |    2 +-
+ net/bluetooth/hci_conn.c         |   23 +++++++++--------------
+ net/bluetooth/l2cap.c            |   16 +++++++++++++++-
+ net/bluetooth/rfcomm/core.c      |   16 +++++++++++++++-
+ 4 files changed, 40 insertions(+), 17 deletions(-)
+
+diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
+index 4b14972..f75028b 100644
+--- a/include/net/bluetooth/hci_core.h
++++ b/include/net/bluetooth/hci_core.h
+@@ -328,7 +328,7 @@ void hci_conn_check_pending(struct hci_dev *hdev);
+ 
+ struct hci_conn *hci_connect(struct hci_dev *hdev, int type, bdaddr_t *dst, __u8 sec_level, __u8 auth_type);
+ int hci_conn_check_link_mode(struct hci_conn *conn);
+-int hci_conn_security(struct hci_conn *conn, __u8 sec_level);
++int hci_conn_security(struct hci_conn *conn, __u8 sec_level, __u8 auth_type);
+ int hci_conn_change_link_key(struct hci_conn *conn);
+ int hci_conn_switch_role(struct hci_conn *conn, __u8 role);
+ 
+diff --git a/net/bluetooth/hci_conn.c b/net/bluetooth/hci_conn.c
+index 2435e83..7fc4c04 100644
+--- a/net/bluetooth/hci_conn.c
++++ b/net/bluetooth/hci_conn.c
+@@ -391,19 +391,14 @@ int hci_conn_check_link_mode(struct hci_conn *conn)
+ EXPORT_SYMBOL(hci_conn_check_link_mode);
+ 
+ /* Authenticate remote device */
+-static int hci_conn_auth(struct hci_conn *conn, __u8 sec_level)
++static int hci_conn_auth(struct hci_conn *conn, __u8 sec_level, __u8 auth_type)
+ {
+ 	BT_DBG("conn %p", conn);
+ 
+-	if (sec_level > conn->sec_level)
+-		conn->link_mode &= ~HCI_LM_AUTH;
+-
+-	conn->sec_level = sec_level;
+-
+-	if (sec_level == BT_SECURITY_HIGH)
+-		conn->auth_type |= 0x01;
+-
+-	if (conn->link_mode & HCI_LM_AUTH)
++	if (sec_level > conn->sec_level) {
++		conn->sec_level = sec_level;
++		conn->auth_type = auth_type;
++	} else if (conn->link_mode & HCI_LM_AUTH)
+ 		return 1;
+ 
+ 	if (!test_and_set_bit(HCI_CONN_AUTH_PEND, &conn->pend)) {
+@@ -417,7 +412,7 @@ static int hci_conn_auth(struct hci_conn *conn, __u8 sec_level)
+ }
+ 
+ /* Enable security */
+-int hci_conn_security(struct hci_conn *conn, __u8 sec_level)
++int hci_conn_security(struct hci_conn *conn, __u8 sec_level, __u8 auth_type)
+ {
+ 	BT_DBG("conn %p", conn);
+ 
+@@ -426,18 +421,18 @@ int hci_conn_security(struct hci_conn *conn, __u8 sec_level)
+ 
+ 	if (sec_level == BT_SECURITY_LOW) {
+ 		if (conn->ssp_mode > 0 && conn->hdev->ssp_mode > 0)
+-			return hci_conn_auth(conn, sec_level);
++			return hci_conn_auth(conn, sec_level, auth_type);
+ 		else
+ 			return 1;
+ 	}
+ 
+ 	if (conn->link_mode & HCI_LM_ENCRYPT)
+-		return hci_conn_auth(conn, sec_level);
++		return hci_conn_auth(conn, sec_level, auth_type);
+ 
+ 	if (test_and_set_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend))
+ 		return 0;
+ 
+-	if (hci_conn_auth(conn, sec_level)) {
++	if (hci_conn_auth(conn, sec_level, auth_type)) {
+ 		struct hci_cp_set_conn_encrypt cp;
+ 		cp.handle  = cpu_to_le16(conn->handle);
+ 		cp.encrypt = 1;
+diff --git a/net/bluetooth/l2cap.c b/net/bluetooth/l2cap.c
+index b677af6..8a93dde 100644
+--- a/net/bluetooth/l2cap.c
++++ b/net/bluetooth/l2cap.c
+@@ -263,8 +263,22 @@ static void l2cap_chan_del(struct sock *sk, int err)
+ static inline int l2cap_check_security(struct sock *sk)
+ {
+ 	struct l2cap_conn *conn = l2cap_pi(sk)->conn;
++	__u8 auth_type;
++
++	switch (l2cap_pi(sk)->sec_level) {
++	case BT_SECURITY_HIGH:
++		auth_type = HCI_AT_GENERAL_BONDING_MITM;
++		break;
++	case BT_SECURITY_MEDIUM:
++		auth_type = HCI_AT_GENERAL_BONDING;
++		break;
++	default:
++		auth_type = HCI_AT_NO_BONDING;
++		break;
++	}
+ 
+-	return hci_conn_security(conn->hcon, l2cap_pi(sk)->sec_level);
++	return hci_conn_security(conn->hcon, l2cap_pi(sk)->sec_level,
++								auth_type);
+ }
+ 
+ static inline u8 l2cap_get_ident(struct l2cap_conn *conn)
+diff --git a/net/bluetooth/rfcomm/core.c b/net/bluetooth/rfcomm/core.c
+index 3717c25..1828ec0 100644
+--- a/net/bluetooth/rfcomm/core.c
++++ b/net/bluetooth/rfcomm/core.c
+@@ -226,8 +226,22 @@ static int rfcomm_l2sock_create(struct socket **sock)
+ static inline int rfcomm_check_security(struct rfcomm_dlc *d)
+ {
+ 	struct sock *sk = d->session->sock->sk;
++	__u8 auth_type;
+ 
+-	return hci_conn_security(l2cap_pi(sk)->conn->hcon, d->sec_level);
++	switch (d->sec_level) {
++	case BT_SECURITY_HIGH:
++		auth_type = HCI_AT_GENERAL_BONDING_MITM;
++		break;
++	case BT_SECURITY_MEDIUM:
++		auth_type = HCI_AT_GENERAL_BONDING;
++		break;
++	default:
++		auth_type = HCI_AT_NO_BONDING;
++		break;
++	}
++
++	return hci_conn_security(l2cap_pi(sk)->conn->hcon, d->sec_level,
++								auth_type);
+ }
+ 
+ /* ---- RFCOMM DLCs ---- */
+-- 
+1.7.0.4
+

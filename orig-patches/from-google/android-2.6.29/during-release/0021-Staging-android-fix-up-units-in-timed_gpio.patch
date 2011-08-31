@@ -1,0 +1,35 @@
+From d88dfb8dc4bfb66066e7c68727c219faaa541206 Mon Sep 17 00:00:00 2001
+From: Greg Kroah-Hartman <gregkh@suse.de>
+Date: Wed, 4 Feb 2009 15:05:05 -0800
+Subject: [PATCH 21/21] Staging: android: fix up units in timed_gpio
+
+The last build fix I did messed up the units of the sysfs file.
+
+This puts them back to be milliseconds, like they originally were.
+
+
+Thanks to Juha Motorsportcom for pointing this out.
+
+Reported-by: Juha Motorsportcom <juha_motorsportcom@luukku.com>
+Cc: Mike Lockwood <lockwood@android.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+---
+ drivers/staging/android/timed_gpio.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/staging/android/timed_gpio.c b/drivers/staging/android/timed_gpio.c
+index 903270c..33daff0 100644
+--- a/drivers/staging/android/timed_gpio.c
++++ b/drivers/staging/android/timed_gpio.c
+@@ -50,7 +50,7 @@ static ssize_t gpio_enable_show(struct device *dev, struct device_attribute *att
+ 	if (hrtimer_active(&gpio_data->timer)) {
+ 		ktime_t r = hrtimer_get_remaining(&gpio_data->timer);
+ 		struct timeval t = ktime_to_timeval(r);
+-		remaining = t.tv_sec * 1000 + t.tv_usec;
++		remaining = t.tv_sec * 1000 + t.tv_usec / 1000;
+ 	} else
+ 		remaining = 0;
+ 
+-- 
+1.7.0.4
+

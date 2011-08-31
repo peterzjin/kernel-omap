@@ -1,0 +1,60 @@
+From d5fd8875d69992631afeb91de0ab8a52d10c915c Mon Sep 17 00:00:00 2001
+From: Wei Yongjun <yjwei@cn.fujitsu.com>
+Date: Wed, 25 Feb 2009 18:09:33 +0800
+Subject: [PATCH 038/247] Bluetooth: Remove some pointless conditionals before kfree_skb()
+
+Remove some pointless conditionals before kfree_skb().
+
+Signed-off-by: Wei Yongjun <yjwei@cn.fujitsu.com>
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ drivers/bluetooth/bfusb.c  |    3 +--
+ drivers/bluetooth/hci_h4.c |    3 +--
+ drivers/bluetooth/hci_ll.c |    3 +--
+ 3 files changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/bluetooth/bfusb.c b/drivers/bluetooth/bfusb.c
+index d3f14be..2a00707 100644
+--- a/drivers/bluetooth/bfusb.c
++++ b/drivers/bluetooth/bfusb.c
+@@ -257,8 +257,7 @@ static inline int bfusb_recv_block(struct bfusb_data *data, int hdr, unsigned ch
+ 
+ 	if (hdr & 0x10) {
+ 		BT_ERR("%s error in block", data->hdev->name);
+-		if (data->reassembly)
+-			kfree_skb(data->reassembly);
++		kfree_skb(data->reassembly);
+ 		data->reassembly = NULL;
+ 		return -EIO;
+ 	}
+diff --git a/drivers/bluetooth/hci_h4.c b/drivers/bluetooth/hci_h4.c
+index b0fafb0..c0ce813 100644
+--- a/drivers/bluetooth/hci_h4.c
++++ b/drivers/bluetooth/hci_h4.c
+@@ -102,8 +102,7 @@ static int h4_close(struct hci_uart *hu)
+ 
+ 	skb_queue_purge(&h4->txq);
+ 
+-	if (h4->rx_skb)
+-		kfree_skb(h4->rx_skb);
++	kfree_skb(h4->rx_skb);
+ 
+ 	hu->priv = NULL;
+ 	kfree(h4);
+diff --git a/drivers/bluetooth/hci_ll.c b/drivers/bluetooth/hci_ll.c
+index b91d45a..5c65014 100644
+--- a/drivers/bluetooth/hci_ll.c
++++ b/drivers/bluetooth/hci_ll.c
+@@ -163,8 +163,7 @@ static int ll_close(struct hci_uart *hu)
+ 	skb_queue_purge(&ll->tx_wait_q);
+ 	skb_queue_purge(&ll->txq);
+ 
+-	if (ll->rx_skb)
+-		kfree_skb(ll->rx_skb);
++	kfree_skb(ll->rx_skb);
+ 
+ 	hu->priv = NULL;
+ 
+-- 
+1.7.0.4
+

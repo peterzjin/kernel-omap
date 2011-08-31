@@ -1,0 +1,62 @@
+From f901a472254fd7a4b991ca0773302d7a28e822e4 Mon Sep 17 00:00:00 2001
+From: San Mehat <san@google.com>
+Date: Thu, 30 Jul 2009 07:58:34 -0700
+Subject: [PATCH 150/247] mmc: core: Rework mmc_delayed_work wakelock so that the wakelock is only extended if a card is added or removed.
+
+Signed-off-by: San Mehat <san@google.com>
+---
+ drivers/mmc/core/core.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index a995d7d..2ea80be 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -764,6 +764,7 @@ void mmc_rescan(struct work_struct *work)
+ 		container_of(work, struct mmc_host, detect.work);
+ 	u32 ocr;
+ 	int err;
++	int extend_wakelock = 0;
+ 
+ 	mmc_bus_get(host);
+ 
+@@ -791,6 +792,7 @@ void mmc_rescan(struct work_struct *work)
+ 		if (!err) {
+ 			if (mmc_attach_sdio(host, ocr))
+ 				mmc_power_off(host);
++			extend_wakelock = 1;
+ 			goto out;
+ 		}
+ 
+@@ -801,6 +803,7 @@ void mmc_rescan(struct work_struct *work)
+ 		if (!err) {
+ 			if (mmc_attach_sd(host, ocr))
+ 				mmc_power_off(host);
++			extend_wakelock = 1;
+ 			goto out;
+ 		}
+ 
+@@ -811,6 +814,7 @@ void mmc_rescan(struct work_struct *work)
+ 		if (!err) {
+ 			if (mmc_attach_mmc(host, ocr))
+ 				mmc_power_off(host);
++			extend_wakelock = 1;
+ 			goto out;
+ 		}
+ 
+@@ -823,8 +827,10 @@ void mmc_rescan(struct work_struct *work)
+ 		mmc_bus_put(host);
+ 	}
+ out:
+-	/* give userspace some time to react */
+-	wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
++	if (extend_wakelock)
++		wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
++	else
++		wake_unlock(&mmc_delayed_work_wake_lock);
+ 
+ 	if (host->caps & MMC_CAP_NEEDS_POLL)
+ 		mmc_schedule_delayed_work(&host->detect, HZ);
+-- 
+1.7.0.4
+

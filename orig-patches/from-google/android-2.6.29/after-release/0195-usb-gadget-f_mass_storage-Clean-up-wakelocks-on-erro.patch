@@ -1,0 +1,26 @@
+From 6962e9ca23f70799bc733d59d177c12e220092a5 Mon Sep 17 00:00:00 2001
+From: Rebecca Schultz Zavin <rebecca@android.com>
+Date: Tue, 25 Aug 2009 15:46:01 -0700
+Subject: [PATCH 195/247] usb: gadget: f_mass_storage: Clean up wakelocks on error paths
+
+Signed-off-by: Rebecca Schultz Zavin <rebecca@android.com>
+Signed-off-by: Mike Lockwood <lockwood@android.com>
+---
+ drivers/usb/gadget/f_mass_storage.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/usb/gadget/f_mass_storage.c b/drivers/usb/gadget/f_mass_storage.c
+index 137e270..f63f572 100644
+--- a/drivers/usb/gadget/f_mass_storage.c
++++ b/drivers/usb/gadget/f_mass_storage.c
+@@ -2962,6 +2962,7 @@ int __init mass_storage_function_add(struct usb_composite_dev *cdev,
+ 	return 0;
+ 
+ err_usb_add_function:
++	wake_lock_destroy(&the_fsg->wake_lock);
+ 	platform_driver_unregister(&fsg_platform_driver);
+ err_platform_driver_register:
+ 	switch_dev_unregister(&the_fsg->sdev);
+-- 
+1.7.0.4
+

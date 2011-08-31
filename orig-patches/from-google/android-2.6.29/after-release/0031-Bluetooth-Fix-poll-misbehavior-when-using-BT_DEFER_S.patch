@@ -1,0 +1,38 @@
+From b692ca43ac8c0fed6b004ca212b15a17e159b3fa Mon Sep 17 00:00:00 2001
+From: Marcel Holtmann <marcel@holtmann.org>
+Date: Mon, 16 Feb 2009 02:57:30 +0100
+Subject: [PATCH 031/247] Bluetooth: Fix poll() misbehavior when using BT_DEFER_SETUP
+
+When BT_DEFER_SETUP has been enabled on a Bluetooth socket it keeps
+signaling POLLIN all the time. This is a wrong behavior. The POLLIN
+should only be signaled if the client socket is in BT_CONNECT2 state
+and the parent has been BT_DEFER_SETUP enabled.
+
+Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+---
+ net/bluetooth/af_bluetooth.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/net/bluetooth/af_bluetooth.c b/net/bluetooth/af_bluetooth.c
+index ded5797..02b9baa 100644
+--- a/net/bluetooth/af_bluetooth.c
++++ b/net/bluetooth/af_bluetooth.c
+@@ -270,12 +270,11 @@ static inline unsigned int bt_accept_poll(struct sock *parent)
+ 	struct list_head *p, *n;
+ 	struct sock *sk;
+ 
+-	if (bt_sk(parent)->defer_setup)
+-		return POLLIN | POLLRDNORM;
+-
+ 	list_for_each_safe(p, n, &bt_sk(parent)->accept_q) {
+ 		sk = (struct sock *) list_entry(p, struct bt_sock, accept_q);
+-		if (sk->sk_state == BT_CONNECTED)
++		if (sk->sk_state == BT_CONNECTED ||
++					(bt_sk(parent)->defer_setup &&
++						sk->sk_state == BT_CONNECT2))
+ 			return POLLIN | POLLRDNORM;
+ 	}
+ 
+-- 
+1.7.0.4
+
