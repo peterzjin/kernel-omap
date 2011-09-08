@@ -64,7 +64,7 @@ static struct early_suspend stop_drawing_early_suspend_desc = {
 };
 
 static ssize_t wait_for_fb_sleep_show(struct kobject *kobj,
-				      struct kobj_attribute *attr, char *buf)
+				      struct subsys_attribute *attr, char *buf)
 {
 	char *s = buf;
 	int ret;
@@ -79,7 +79,7 @@ static ssize_t wait_for_fb_sleep_show(struct kobject *kobj,
 }
 
 static ssize_t wait_for_fb_wake_show(struct kobject *kobj,
-				     struct kobj_attribute *attr, char *buf)
+				     struct subsys_attribute *attr, char *buf)
 {
 	char *s = buf;
 	int ret;
@@ -103,7 +103,7 @@ static ssize_t wait_for_fb_wake_show(struct kobject *kobj,
 }
 
 #define power_ro_attr(_name) \
-static struct kobj_attribute _name##_attr = {	\
+static struct subsys_attribute _name##_attr = {	\
 	.attr	= {				\
 		.name = __stringify(_name),	\
 		.mode = 0444,			\
