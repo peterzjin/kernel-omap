@@ -16,7 +16,6 @@
  */
 
 #include <asm/cacheflush.h>
-#include <linux/fdtable.h>
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/list.h>
@@ -1419,7 +1418,7 @@ binder_transaction(struct binder_proc *proc, struct binder_thread *thread,
 		t->from = thread;
 	else
 		t->from = NULL;
-	t->sender_euid = proc->tsk->cred->euid;
+	t->sender_euid = proc->tsk->euid;
 	t->to_proc = target_proc;
 	t->to_thread = target_thread;
 	t->code = tr->code;
@@ -2622,16 +2621,16 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			goto err;
 		}
 		if (binder_context_mgr_uid != -1) {
-			if (binder_context_mgr_uid != current->cred->euid) {
+			if (binder_context_mgr_uid != current->euid) {
 				printk(KERN_ERR "binder: BINDER_SET_"
 				       "CONTEXT_MGR bad uid %d != %d\n",
-				       current->cred->euid,
+				       current->euid,
 				       binder_context_mgr_uid);
 				ret = -EPERM;
 				goto err;
 			}
 		} else
-			binder_context_mgr_uid = current->cred->euid;
+			binder_context_mgr_uid = current->euid;
 		binder_context_mgr_node = binder_new_node(proc, NULL, NULL);
 		if (binder_context_mgr_node == NULL) {
 			ret = -ENOMEM;

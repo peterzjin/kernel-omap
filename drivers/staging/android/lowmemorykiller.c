@@ -73,10 +73,7 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 	}
 	if(nr_to_scan > 0)
 		lowmem_print(3, "lowmem_shrink %d, %x, ofree %d %d, ma %d\n", nr_to_scan, gfp_mask, other_free, other_file, min_adj);
-	rem = global_page_state(NR_ACTIVE_ANON) +
-		global_page_state(NR_ACTIVE_FILE) +
-		global_page_state(NR_INACTIVE_ANON) +
-		global_page_state(NR_INACTIVE_FILE);
+	rem = global_page_state(NR_ACTIVE) + global_page_state(NR_INACTIVE);
 	if (nr_to_scan <= 0 || min_adj == OOM_ADJUST_MAX + 1) {
 		lowmem_print(5, "lowmem_shrink %d, %x, return %d\n", nr_to_scan, gfp_mask, rem);
 		return rem;
@@ -84,27 +81,43 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 
 	read_lock(&tasklist_lock);
 	for_each_process(p) {
-		if (p->oomkilladj < min_adj || !p->mm)
+		struct signal_struct *sig;
+		int oom_adj;
+
+		sig = p->signal;
+		if (!sig)
+			continue;
+		oom_adj = sig->oom_adj;
+
+		if (oom_adj < min_adj || !p->mm)
 			continue;
 		tasksize = get_mm_rss(p->mm);
 		if (tasksize <= 0)
 			continue;
 		if (selected) {
-			if (p->oomkilladj < selected->oomkilladj)
+			struct signal_struct *selected_sig;
+			int selected_oom_adj;
+
+			selected_sig = selected->signal;
+			if (!selected_sig)
 				continue;
-			if (p->oomkilladj == selected->oomkilladj &&
+			selected_oom_adj = selected_sig->oom_adj;
+
+			if (oom_adj < selected_oom_adj)
+				continue;
+			if (oom_adj == selected_oom_adj &&
 			    tasksize <= selected_tasksize)
 				continue;
 		}
 		selected = p;
 		selected_tasksize = tasksize;
 		lowmem_print(2, "select %d (%s), adj %d, size %d, to kill\n",
-		             p->pid, p->comm, p->oomkilladj, tasksize);
+		             p->pid, p->comm, p->signal->oom_adj, tasksize);
 	}
 	if(selected != NULL) {
 		lowmem_print(1, "send sigkill to %d (%s), adj %d, size %d\n",
 		             selected->pid, selected->comm,
-		             selected->oomkilladj, selected_tasksize);
+		             selected->signal->oom_adj, selected_tasksize);
 		force_sig(SIGKILL, selected);
 		rem -= selected_tasksize;
 	}
