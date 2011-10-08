@@ -14,6 +14,8 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/battery_simple.h>
+#include <linux/power_supply.h>
+#include <linux/workqueue.h>
 
 #include "../w1.h"
 #include "../w1_int.h"
@@ -1164,6 +1166,202 @@ static struct battery_ops ds2784_battery_ops = {
 	.get_current       = ds2784_getcurrent,
 };
 
+#ifdef CONFIG_ANDROID
+/* Time between samples (in milliseconds) */
+#define BAT_POLL_INTERVAL	10000
+#define PREPLUS_BATTERY_NAME	"battery"
+
+/*
+ * Battery driver
+ */
+
+/* Driver data */
+struct preplus_battery {
+	struct power_supply		bat;
+//	struct power_supply		psy[preplus_BATTERY_NUM];
+
+//	struct s3c_adc_client		*client;
+//	struct spica_battery_pdata	*pdata;
+//	struct work_struct		work;
+	struct workqueue_struct		*workqueue;
+	struct delayed_work		poll_work;
+	struct mutex			mutex;
+	struct device			*dev;
+#if 0
+#ifdef CONFIG_HAS_WAKELOCK
+	struct wake_lock	wakelock;
+	struct wake_lock	chg_wakelock;
+	struct wake_lock	fault_wakelock;
+	struct wake_lock	suspend_lock;
+#endif
+#ifdef CONFIG_RTC_INTF_ALARM
+	struct alarm		alarm;
+#endif
+#endif
+	unsigned int irq_pok;
+	unsigned int irq_chg;
+
+	int percent_value;
+	int volt_value;
+	int temp_value;
+	int status;
+	int health;
+//	int online[SPICA_BATTERY_NUM];
+	int fault;
+	int chg_enable;
+//	enum spica_battery_supply supply;
+
+	unsigned int		interval;
+//	struct average_data	volt_avg;
+//	struct average_data	temp_avg;
+//	struct lookup_data	percent_lookup;
+//	struct lookup_data	volt_lookup;
+//	struct lookup_data	temp_lookup;
+}preplus_battery;
+
+static int ds2784_get_status(int *status)
+{
+	int err;
+	int current_uA;
+	int capacity;
+
+	err = ds2784_getcurrent(&current_uA);
+	if (err)
+		return err;
+
+	err =ds2784_getpercent(&capacity);
+	if (err)
+		return err;
+
+	if (capacity == 100)
+		*status = POWER_SUPPLY_STATUS_FULL;
+	else if (current_uA == 0)
+		*status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+	else if (current_uA < 0)
+		*status = POWER_SUPPLY_STATUS_DISCHARGING;
+	else
+		*status = POWER_SUPPLY_STATUS_CHARGING;
+
+	return 0;
+}
+
+static int ds2784_battery_get_property(struct power_supply *psy,
+				       enum power_supply_property prop,
+				       union power_supply_propval *val)
+{
+	int ret = 0;
+
+	switch (prop) {
+	case POWER_SUPPLY_PROP_STATUS:
+		ret = ds2784_get_status(&val->intval);
+		break;
+	case POWER_SUPPLY_PROP_CAPACITY:
+		ret = ds2784_getpercent(&val->intval);
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		ret = ds2784_getvoltage(&val->intval);
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_NOW:
+		ret = ds2784_getcurrent(&val->intval);
+		break;
+	case POWER_SUPPLY_PROP_TEMP:
+		ret = ds2784_gettemperature(&val->intval);
+		break;
+	case POWER_SUPPLY_PROP_PRESENT:
+		val->intval = 1;
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+static enum power_supply_property ds2784_battery_props[] = {
+	POWER_SUPPLY_PROP_STATUS,
+	POWER_SUPPLY_PROP_CAPACITY,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_CURRENT_NOW,
+	POWER_SUPPLY_PROP_TEMP,
+	POWER_SUPPLY_PROP_PRESENT
+};
+
+static void ds2784_power_supply_init(struct power_supply *battery)
+{
+	battery->type			= POWER_SUPPLY_TYPE_BATTERY;
+	battery->properties		= ds2784_battery_props;
+	battery->num_properties		= ARRAY_SIZE(ds2784_battery_props);
+	battery->get_property		= ds2784_battery_get_property;
+	battery->external_power_changed	= NULL;
+}
+
+/* Polling function */
+static void preplus_battery_poll(struct work_struct *work)
+{
+	/* only to report event chang to android */
+	struct preplus_battery *bat = &preplus_battery;
+	/* Schedule next poll */
+	queue_delayed_work(bat->workqueue, &bat->poll_work,
+				msecs_to_jiffies(bat->interval));
+	power_supply_changed(&bat->bat);
+}
+
+static int ds2784_probe(struct device *parent)
+{
+	int ret;
+	struct preplus_battery *bat = &preplus_battery;
+
+	bat->interval = BAT_POLL_INTERVAL;
+	INIT_DELAYED_WORK(&bat->poll_work, preplus_battery_poll);
+	mutex_init(&bat->mutex);
+	mutex_lock(&bat->mutex);
+
+	ds2784_power_supply_init(&bat->bat);
+	bat->bat.name = kasprintf(GFP_KERNEL, "%s",PREPLUS_BATTERY_NAME);
+	if (!bat->bat.name) {
+		ret = -ENOMEM;
+		goto fail_name;
+	}
+
+	ret = power_supply_register(parent, &bat->bat);
+	if (ret) {
+		printk(KERN_ERR "failed to register power_supply battery\n");
+		ret = -ENOMEM;
+		goto fail_register;
+	}
+
+	bat->workqueue = create_freezeable_workqueue(dev_name(parent));
+	if (!bat->workqueue) {
+		dev_err(parent, "Failed to create freezeable workqueue\n");
+		ret = -ENOMEM;
+		goto err_bat_unreg;
+	}
+	queue_delayed_work(bat->workqueue, &bat->poll_work, 0);
+
+	return 0;
+
+err_bat_unreg:
+	power_supply_unregister(&bat->bat);
+fail_register:
+	kfree(bat->bat.name);
+fail_name:
+	mutex_unlock(&bat->mutex);
+	return ret;
+}
+
+static int ds2784_remove(void)
+{
+	struct preplus_battery *bat = &preplus_battery;
+
+	power_supply_unregister(&bat->bat);
+	cancel_delayed_work_sync(&bat->poll_work);
+	destroy_workqueue(bat->workqueue);
+	kfree(bat->bat.name);
+	return 0;
+}
+
+#endif
+
 #endif
 
 
@@ -1249,7 +1447,9 @@ static int w1_ds2784_add_slave(struct w1_slave *sl)
 		printk(KERN_ERR "Creating sysfs mac failed\n");
 
 	battery_device = &sl->dev;
-
+#if defined(CONFIG_BATTERY_SIMPLE) && defined(CONFIG_ANDROID)
+	ds2784_probe(&sl->dev);
+#endif
 	return err;
 }
 
@@ -1276,7 +1476,9 @@ static void w1_ds2784_remove_slave(struct w1_slave *sl)
 	device_remove_file(&sl->dev, &dev_attr_gettemp);
 	device_remove_file(&sl->dev, &dev_attr_validate_battery);
 	device_remove_file(&sl->dev, &dev_attr_mac);
-
+#if defined(CONFIG_BATTERY_SIMPLE) && defined(CONFIG_ANDROID)
+	ds2784_remove();
+#endif
 	battery_device = NULL;
 }
 
