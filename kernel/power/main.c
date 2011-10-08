@@ -392,6 +392,7 @@ pm_trace_store(struct kset *kset, const char *buf, size_t n)
 }
 
 power_attr(pm_trace);
+#endif /* CONFIG_PM_TRACE */
 
 #ifdef CONFIG_USER_WAKELOCK
 power_attr(wake_lock);
@@ -400,19 +401,15 @@ power_attr(wake_unlock);
 
 static struct attribute * g[] = {
 	&state_attr.attr,
+#ifdef CONFIG_PM_TRACE
 	&pm_trace_attr.attr,
+#endif
 #ifdef CONFIG_USER_WAKELOCK
 	&wake_lock_attr.attr,
 	&wake_unlock_attr.attr,
 #endif
 	NULL,
 };
-#else
-static struct attribute * g[] = {
-	&state_attr.attr,
-	NULL,
-};
-#endif /* CONFIG_PM_TRACE */
 
 static struct attribute_group attr_group = {
 	.attrs = g,

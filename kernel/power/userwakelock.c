@@ -125,8 +125,7 @@ bad_arg:
 	return ERR_PTR(-EINVAL);
 }
 
-ssize_t wake_lock_show(
-	struct kobject *kobj, struct subsys_attribute *attr, char *buf)
+ssize_t wake_lock_show(struct kset *kset, char *buf)
 {
 	char *s = buf;
 	char *end = buf + PAGE_SIZE;
@@ -146,9 +145,7 @@ ssize_t wake_lock_show(
 	return (s - buf);
 }
 
-ssize_t wake_lock_store(
-	struct kobject *kobj, struct subsys_attribute *attr,
-	const char *buf, size_t n)
+ssize_t wake_lock_store(struct kset *kset, const char *buf, size_t n)
 {
 	long timeout;
 	struct user_wake_lock *l;
@@ -173,8 +170,7 @@ bad_name:
 }
 
 
-ssize_t wake_unlock_show(
-	struct kobject *kobj, struct subsys_attribute *attr, char *buf)
+ssize_t wake_unlock_show(struct kset *kset, char *buf)
 {
 	char *s = buf;
 	char *end = buf + PAGE_SIZE;
@@ -194,9 +190,7 @@ ssize_t wake_unlock_show(
 	return (s - buf);
 }
 
-ssize_t wake_unlock_store(
-	struct kobject *kobj, struct subsys_attribute *attr,
-	const char *buf, size_t n)
+ssize_t wake_unlock_store(struct kset *kset, const char *buf, size_t n)
 {
 	struct user_wake_lock *l;
 

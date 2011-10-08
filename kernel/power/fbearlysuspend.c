@@ -63,8 +63,7 @@ static struct early_suspend stop_drawing_early_suspend_desc = {
 	.resume = start_drawing_late_resume,
 };
 
-static ssize_t wait_for_fb_sleep_show(struct kobject *kobj,
-				      struct subsys_attribute *attr, char *buf)
+static ssize_t wait_for_fb_sleep_show(struct kset *kset, char *buf)
 {
 	char *s = buf;
 	int ret;
@@ -78,8 +77,7 @@ static ssize_t wait_for_fb_sleep_show(struct kobject *kobj,
 	return s - buf;
 }
 
-static ssize_t wait_for_fb_wake_show(struct kobject *kobj,
-				     struct subsys_attribute *attr, char *buf)
+static ssize_t wait_for_fb_wake_show(struct kset *kset, char *buf)
 {
 	char *s = buf;
 	int ret;
