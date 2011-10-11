@@ -181,6 +181,10 @@ enum {
 typedef struct tsc_drv_data {
 	struct spi_device		*spidev;
 	struct cy8mrln_platform_data	*pdata;
+#ifdef CONFIG_ANDROID
+	struct input_dev		*input_dev;
+	struct tslib_cy8mrln_palmpre	*tslib_priv;
+#endif
 #ifdef CONFIG_HIGH_RES_TIMERS
 	struct hrtimer			scan_timer;
 	struct hrtimer			timeout;
@@ -232,6 +236,81 @@ typedef struct tsc_drv_data {
 	DECLARE_BITMAP(flags, 12);
 	u8						tp_status_reg0;
 } tsc_drv_data_t;
+
+#ifdef CONFIG_ANDROID
+
+#define SCREEN_WIDTH			319
+#define SCREEN_HEIGHT			527
+#define H_FIELDS			7
+#define V_FIELDS			11
+#define TOTAL_FIELDS			(H_FIELDS * V_FIELDS)
+#define DEFAULT_SCANRATE		60
+#define DEFAULT_VERBOSE			0
+#define DEFAULT_WOT_THRESHOLD		22
+#define DEFAULT_SLEEPMODE		CY8MRLN_ON_STATE
+#define DEFAULT_WOT_SCANRATE		WOT_SCANRATE_512HZ
+#define DEFAULT_TIMESTAMP_MODE		1
+#define DEFAULT_GESTURE_HEIGHT		1
+#define DEFAULT_NOISE			25
+#define DEFAULT_PRESSURE		60
+#define DEFAULT_SENSOR_DELTA_X		(SCREEN_WIDTH / H_FIELDS)
+#define DEFAULT_SENSOR_DELTA_Y		(SCREEN_HEIGHT / (V_FIELDS - DEFAULT_GESTURE_HEIGHT))
+#define DEFAULT_SENSOR_OFFSET_X		(DEFAULT_SENSOR_DELTA_X / 2)
+#define DEFAULT_SENSOR_OFFSET_Y		(DEFAULT_SENSOR_DELTA_Y / 2)
+#define MIN_VALUE			700
+#define MAX_VALUE			1500
+#define ASLEEP_SCANRATE			5
+#define DISCARD_FRAMES			5
+#define field_nr(x, y)			(y * H_FIELDS + (H_FIELDS - x) - 1)
+
+struct tsc_drv_data *cy8mrln_drv_data = NULL;
+
+struct ts_sample {
+	int             x;
+	int             y;
+	unsigned int    pressure;
+};
+
+struct cy8mrln_palmpre_input
+{
+	uint16_t	n_r;
+	uint16_t	field[H_FIELDS * V_FIELDS];
+	uint16_t	ffff;			/* always 0xffff */
+	uint8_t		seq_nr1;		/* incremented if seq_nr0 == scanrate */
+	uint16_t	seq_nr2;		/* incremeted if seq_nr1 == 255 */
+	uint8_t		unknown[4];
+	uint8_t		seq_nr0;		/* incremented [0:scanrate] */
+	uint8_t		null;		   	/* NULL byte */
+}__attribute__((packed));
+
+struct tslib_cy8mrln_palmpre
+{
+	uint16_t			references[H_FIELDS * V_FIELDS];
+	int				scanrate;
+	int				verbose;
+	int				wot_threshold;
+	int				sleepmode;
+	int				wot_scanrate;
+	int				timestamp_mode;
+	int				gesture_height;
+	int				noise;
+	int				pressure;
+	int				sensor_offset_x;
+	int				sensor_offset_y;
+	int				sensor_delta_x;
+	int				sensor_delta_y;
+	int				last_n_valid_samples;
+	struct ts_sample*		last_valid_samples;
+	int 				discard_frames;
+	int 				old_scanrate;
+};
+
+int cy8mrln_palmpre_parse(struct input_dev *input_dev,
+			struct tslib_cy8mrln_palmpre *cy8mrln_info,
+			unsigned char *buf);
+static int __init cy8mrln_android_probe(struct tsc_drv_data *dev);
+static void __devexit cy8mrln_android_remove(struct tsc_drv_data *dev);
+#endif
 
 static int cy8mrln_reg_write(struct tsc_drv_data *dev, u16 reg, u8 data);
 static int cy8mrln_write_three_bytes(struct tsc_drv_data *dev, u32 data);
@@ -988,6 +1067,10 @@ cy8mrln_work_handler_new(struct work_struct *work)
 		
 		cy8mrln_put_rx_buffer(dev, rxbuf, CY8MRLN_NUM_DATA_BYTES +\
 				      TIMESTAMP_SIZE_BYTES + NUM_TP_DRV_STATUS_REG_BYTES );
+
+#ifdef CONFIG_ANDROID
+		cy8mrln_palmpre_parse(dev->input_dev, dev->tslib_priv, rxbuf->ptr);
+#endif
 
 		/* Set the flag to unblock the suspend. */
 		set_bit(INTR_HANDLED, dev->flags);
@@ -2955,7 +3038,11 @@ cy8mrln_ioctl(struct inode * inode, struct file *file,
               unsigned int cmd, unsigned long args)
 {
 	int rc = 0;
+#ifdef CONFIG_ANDROID
+	struct tsc_drv_data *dev = cy8mrln_drv_data;
+#else
 	struct tsc_drv_data *dev = file->private_data;
+#endif
 	void *usr_ptr   = (void*) (args);
 	int   usr_bytes = _IOC_SIZE(cmd);
 
@@ -4044,6 +4131,10 @@ cy8mrln_remove(struct spi_device *spi)
 
 	PDBG("%s:\n", __FUNCTION__ );
 
+#ifdef CONFIG_ANDROID
+	cy8mrln_android_remove(dev);
+#endif
+
 	misc_deregister(&dev->mdev);
 
 	/* detach drvdata */
@@ -4125,6 +4216,251 @@ cy8mrln_init_queues(struct tsc_drv_data *dev)
 
 	return 0;
 }
+
+#ifdef CONFIG_ANDROID
+static int __init cy8mrln_android_probe(struct tsc_drv_data *dev)
+{
+	int arg, rc;
+
+	cy8mrln_drv_data = dev;
+	dev->input_dev = input_allocate_device();
+	if (dev->input_dev == NULL) {
+		printk(KERN_ERR "%s: Failed to allocate input device!\n",
+				DRIVER);
+		return -ENODEV;
+	}
+	dev->input_dev->name = DRIVER_DESC;
+	set_bit(EV_SYN, dev->input_dev->evbit);
+	set_bit(EV_KEY, dev->input_dev->evbit);
+	set_bit(BTN_TOUCH, dev->input_dev->keybit);
+	set_bit(BTN_2, dev->input_dev->keybit);
+	set_bit(EV_ABS, dev->input_dev->evbit);
+
+	rc = input_register_device(dev->input_dev);
+	if (rc) {
+		printk(KERN_ERR "%s: Failed to register input device!\n",
+				DRIVER);
+		goto err1;
+	}
+
+	input_set_abs_params(dev->input_dev, ABS_X, 0, SCREEN_WIDTH, 0, 0);
+	input_set_abs_params(dev->input_dev, ABS_Y, 0, SCREEN_HEIGHT, 0, 0);
+	input_set_abs_params(dev->input_dev, ABS_PRESSURE, 0, 100, 0, 0);
+
+	dev->tslib_priv = (struct tslib_cy8mrln_palmpre *)kzalloc(
+			sizeof(struct tslib_cy8mrln_palmpre), GFP_KERNEL);
+	if (dev->tslib_priv == NULL) {
+		printk (KERN_ERR "%s: Can't allocate tslib_priv.\n",
+			DRIVER);
+		goto err2;
+	}
+
+	dev->tslib_priv->last_valid_samples = NULL;
+	dev->tslib_priv->last_n_valid_samples = 0;
+	dev->tslib_priv->verbose = DEFAULT_VERBOSE;
+	dev->tslib_priv->scanrate = DEFAULT_SCANRATE;
+	dev->tslib_priv->timestamp_mode = DEFAULT_TIMESTAMP_MODE;
+	dev->tslib_priv->sleepmode = DEFAULT_SLEEPMODE;
+	dev->tslib_priv->wot_scanrate = DEFAULT_WOT_SCANRATE;
+	dev->tslib_priv->wot_threshold = DEFAULT_WOT_THRESHOLD;
+	dev->tslib_priv->gesture_height = DEFAULT_GESTURE_HEIGHT;
+	dev->tslib_priv->noise = DEFAULT_NOISE;
+	dev->tslib_priv->pressure = DEFAULT_PRESSURE;
+	dev->tslib_priv->sensor_offset_x = DEFAULT_SENSOR_OFFSET_X;
+	dev->tslib_priv->sensor_offset_y = DEFAULT_SENSOR_OFFSET_Y;
+	dev->tslib_priv->sensor_delta_x = DEFAULT_SENSOR_DELTA_X;
+	dev->tslib_priv->sensor_delta_y = DEFAULT_SENSOR_DELTA_Y;
+
+	arg = DEFAULT_VERBOSE;
+	cy8mrln_ioctl(NULL, NULL, CY8MRLN_IOCTL_SET_VERBOSE_MODE, (unsigned long)&arg);
+	arg = DEFAULT_SCANRATE;
+	cy8mrln_ioctl(NULL, NULL, CY8MRLN_IOCTL_SET_SCANRATE, (unsigned long)&arg);
+	arg = DEFAULT_TIMESTAMP_MODE;
+	cy8mrln_ioctl(NULL, NULL, CY8MRLN_IOCTL_SET_TIMESTAMP_MODE, (unsigned long)&arg);
+	arg = DEFAULT_SLEEPMODE;
+	cy8mrln_ioctl(NULL, NULL, CY8MRLN_IOCTL_SET_SLEEPMODE, (unsigned long)&arg);
+	arg = DEFAULT_WOT_SCANRATE;
+	cy8mrln_ioctl(NULL, NULL, CY8MRLN_IOCTL_SET_WOT_SCANRATE, (unsigned long)&arg);
+	arg = DEFAULT_WOT_THRESHOLD;
+	cy8mrln_ioctl(NULL, NULL, CY8MRLN_IOCTL_SET_WOT_THRESHOLD, (unsigned long)&arg);
+
+	return 0;
+
+err2:
+	input_unregister_device(dev->input_dev);
+err1:
+	input_free_device(dev->input_dev);
+	return -ENODEV;
+}
+
+static void __devexit cy8mrln_android_remove(struct tsc_drv_data *dev)
+{
+	input_unregister_device(dev->input_dev);
+	input_free_device(dev->input_dev);
+}
+
+/*
+*     y1
+* x1 (xy) x3
+*     y3
+*/
+
+static void cy8mrln_palmpre_interpolate(struct tslib_cy8mrln_palmpre* info,
+		uint16_t field[H_FIELDS * V_FIELDS],
+		int x, int y, struct ts_sample *out)
+{
+	//float fx, fy;
+	int tmpxy, tmpx1, tmpx3, tmpy1, tmpy3;
+	int posx = info->sensor_delta_x * x + info->sensor_offset_x;
+	int posy = info->sensor_delta_y * y + info->sensor_offset_y;
+
+	tmpxy = field[field_nr(x, y)];
+
+	if (x == (H_FIELDS - 1)) {
+		tmpx3 = info->pressure - tmpxy;
+	} else {
+		tmpx3 = field[field_nr(x, y) - 1];
+	}
+	if (x == 0)
+		tmpx1 = info->pressure - tmpxy;
+	else
+		tmpx1 = field[field_nr(x, y) + 1];
+
+	if (y == (V_FIELDS - 1)) {
+		tmpy3 = info->pressure - tmpxy;
+	} else {
+		tmpy3 = field[field_nr(x, y) + H_FIELDS];
+	}
+	if (y == 0)
+		tmpy1 = info->pressure - tmpxy;
+	else
+		tmpy1 = field[field_nr(x, y) - H_FIELDS];
+
+	//fx = (float)(tmpx3 - tmpx1) / ((float)tmpxy * 1.5);
+	//fy = (float)(tmpy3 - tmpy1) / ((float)tmpxy * 1.5);
+
+	//out->x = posx + fx * info->sensor_delta_x;
+	//out->y = posy + fy * info->sensor_delta_y;
+	out->x = posx + ((tmpx3 - tmpx1) * info->sensor_delta_x * 2) / (tmpxy * 3);
+	out->y = posy + ((tmpy3 - tmpy1) * info->sensor_delta_y * 2) / (tmpxy * 3);
+}
+
+static int cy8mrln_palmpre_update_references(
+		uint16_t references[H_FIELDS * V_FIELDS],
+		uint16_t field[H_FIELDS * V_FIELDS])
+{
+	int i;
+
+	for (i = 0; i < TOTAL_FIELDS; i ++) {
+		if (field[i] < MIN_VALUE || field[i] > MAX_VALUE) {
+			PDBG("Discrading frame with %i at[%i]\n", field[i], i);
+			return 1;
+		}
+
+		if (field[i] > references[i]) {
+			references[i] = field[i];
+			field[i] = 0;
+		} else {
+			field[i] = references[i] - field[i];
+		}
+	}
+
+	return 0;
+}
+
+int cy8mrln_palmpre_parse(struct input_dev *input_dev,
+			struct tslib_cy8mrln_palmpre *cy8mrln_info,
+			unsigned char *buf)
+{
+	/* we can only read one input struct at once */
+	struct cy8mrln_palmpre_input cy8mrln_evt;
+	int max_x = 0, max_y = 0, max_x_y = 0, max_value = 0, i;
+	uint16_t tmp_value;
+	struct ts_sample samp;
+
+	/* initalize all samples with proper values */
+	memset(&samp, '\0', sizeof(struct ts_sample));
+	memcpy(&cy8mrln_evt, buf, sizeof(cy8mrln_evt));
+	if (cy8mrln_palmpre_update_references(cy8mrln_info->references, cy8mrln_evt.field)) {
+		if (cy8mrln_info->discard_frames == 0) {
+			int arg;
+			/* backup current scanrate */
+			cy8mrln_info->old_scanrate = cy8mrln_info->scanrate;
+			arg = ASLEEP_SCANRATE;
+			cy8mrln_ioctl(NULL, NULL, CY8MRLN_IOCTL_SET_SCANRATE, (unsigned long)&arg);
+			cy8mrln_info->scanrate = ASLEEP_SCANRATE;
+			cy8mrln_info->discard_frames = DISCARD_FRAMES;
+			PDBG("go to sleep\n");
+		}
+
+		return 0;
+	}
+
+	/* reset scanrate after waking up */
+	if (cy8mrln_info->discard_frames == DISCARD_FRAMES) {
+		int arg = cy8mrln_info->scanrate;
+		cy8mrln_ioctl(NULL, NULL, CY8MRLN_IOCTL_SET_SCANRATE, (unsigned long)&arg);
+		cy8mrln_info->scanrate = arg;
+		PDBG("woke up\n");
+	}
+
+	if (cy8mrln_info->discard_frames) {
+#ifdef MODDEBUG
+		int x, y;
+		PDBG("cy8mrln_palmpre: discarded frames %i\n", cy8mrln_info->discard_frames);
+		for (y = 0; y < V_FIELDS; y ++) {
+			for (x = 0; x < H_FIELDS; x++) {
+				PDBG("%3i", cy8mrln_evt.field[field_nr(x, y)]);
+			}
+			PDBG("\n");
+		}
+#endif
+		cy8mrln_info->discard_frames --;
+		/* discard frame */
+		return 0;
+	}
+
+	max_x = 0;
+	max_y = 0;
+	max_value = 0;
+	max_x_y = 0;
+	for (i = 0; i < TOTAL_FIELDS; i ++) {
+		tmp_value = cy8mrln_evt.field[i];
+
+		/* check for the maximum value */
+		if (tmp_value > max_value) {
+			max_value = tmp_value;
+			max_x_y = i;
+		}
+	}
+	max_x = H_FIELDS - max_x_y % H_FIELDS - 1;
+	max_y = max_x_y / H_FIELDS;
+
+	/* only caluclate events that are not noise */
+	if (max_value > cy8mrln_info->noise) {
+		cy8mrln_palmpre_interpolate(cy8mrln_info, cy8mrln_evt.field, max_x, max_y, &samp);
+		samp.pressure = max_value;
+		PDBG("get x[%d] y[%d] pressure[%d]\n", samp.x, samp.y, samp.pressure);
+		input_report_abs(input_dev, ABS_X, samp.x);
+		input_report_abs(input_dev, ABS_Y, samp.y);
+		input_report_abs(input_dev, ABS_PRESSURE, samp.pressure);
+		input_report_key(input_dev, BTN_TOUCH, 1);
+		input_sync(input_dev);
+		cy8mrln_info->last_n_valid_samples = 1;
+	} else {
+		//return last samples with pressure = 0 to show a mouse up
+		if (cy8mrln_info->last_n_valid_samples) {
+			input_report_abs(input_dev, ABS_PRESSURE, 0);
+			input_report_key(input_dev, BTN_TOUCH, 0);
+			input_sync(input_dev);
+			cy8mrln_info->last_n_valid_samples = 0;
+			PDBG("cy8mrln_palmpre: Returning a sample with 0 pressure\n");
+		}
+	}
+
+	return 0;
+}
+#endif
 
 static int __init 
 cy8mrln_probe(struct spi_device *spi)
@@ -4280,6 +4616,15 @@ cy8mrln_probe(struct spi_device *spi)
 	dev->read_option = CY8MRLN_ONE_INT_ZERO_SETUP_BYTES; 
 	dev->xfer_option = CY8MRLN_DMA_XFER_OPTION;
 	dev->num_data_bytes = CY8MRLN_DEFALUT_NUM_DATA_BYTES;
+
+#ifdef CONFIG_ANDROID
+	rc = cy8mrln_android_probe(dev);
+	if (rc < 0) {
+		printk (KERN_ERR "%s: Can't probe for android.\n",
+			DRIVER);
+		goto err4;
+	}
+#endif
 
 	return 0;
 
