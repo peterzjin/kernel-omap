@@ -421,7 +421,20 @@ static struct display_device_ops lcd_panel_ops = {
 	 *     omap2_dss_rgb_enable(void)
 	 * Do not implement suspend/resume here.
 	 */
+#ifdef CONFIG_ANDROID
+/* Android need the driver to resume itself */
+static int lcd_resume(struct platform_device *pdev)
+{
+	struct display_device *dev = platform_get_drvdata(pdev);
+
+	DPRINTK("%s\n", __FUNCTION__);
+
+	lcd_set_state(dev, 1);
+	return 0;
+}
+#else
 #    define lcd_resume	NULL
+#endif
 
 static int lcd_suspend(struct platform_device *pdev, pm_message_t state)
 {
