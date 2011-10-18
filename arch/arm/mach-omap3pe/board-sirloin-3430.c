@@ -2189,6 +2189,64 @@ static struct platform_device nduid_device = {
 #endif
 
 /*
+ * Android virtual keys
+ */
+#if defined(CONFIG_TOUCHSCREEN_CY8MRLN) && defined(CONFIG_ANDROID)
+
+/*                  320
+ *        ----------------------  --
+ *        |                    |
+ *        |                    |
+ *        |                    |
+ *        |                    |
+ *        |                    |
+ *        |       SCREEN       |  480
+ *        |                    |
+ *        |                    |
+ *        |                    |
+ *        |                    |
+ *        |                    |
+ *        |--------------------|  --
+ *        |      SAFE_GAP      |  8
+ *        |--------------------|  --
+ *        |      | KEYS |      |
+ *        |      |      |      |  40
+ *        |      |  106 |      |
+ *        |--------------------|  --
+ */
+
+static ssize_t sirloin_virtualkeys_show(struct kset *subsys, char *buf)
+{
+	int width, height, centerx, centery, safe_gap;
+
+	safe_gap = 8;
+	width = 106;
+	height = 40;
+	centerx = width / 2;
+	centery = 480 + safe_gap + height / 2;
+
+	return sprintf(buf,
+			__stringify(EV_KEY) ":" __stringify(KEY_MENU) ":%d:%d:%d:%d"
+			":" __stringify(EV_KEY) ":" __stringify(KEY_HOME) ":%d:%d:%d:%d"
+			":" __stringify(EV_KEY) ":" __stringify(KEY_BACK) ":%d:%d:%d:%d"
+			"\n", centerx, centery, width, height,
+			centerx + width, centery, width, height,
+			centerx + 2 * width, centery, width, height);
+}
+
+decl_subsys(board_properties, NULL, NULL);
+
+static struct subsys_attribute virtualkeys_attr = {
+	.attr = {
+		.name = "virtualkeys.cy8mrln",
+		.mode = 0444,
+	},
+	.show = sirloin_virtualkeys_show,
+};
+
+#endif
+
+/*
  *  sirloin devices
  */
 static struct platform_device *board_devices[] __initdata = {
@@ -2706,6 +2764,11 @@ static void __init machine_init ( void )
 	/* GPIO KEYs*/
 	board_gpio_keys_init();
 #endif // CONFIG_KEYBOARD_GPIO_PE
+
+#if defined(CONFIG_TOUCHSCREEN_CY8MRLN) && defined(CONFIG_ANDROID)
+	if (subsystem_register(&board_properties_subsys) == 0)
+		subsys_create_file(&board_properties_subsys, &virtualkeys_attr);
+#endif
 }
 
 arch_initcall(board_init_i2c);

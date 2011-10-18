@@ -4229,11 +4229,12 @@ static int __init cy8mrln_android_probe(struct tsc_drv_data *dev)
 				DRIVER);
 		return -ENODEV;
 	}
-	dev->input_dev->name = DRIVER_DESC;
+	dev->input_dev->name = DRIVER;
 	set_bit(EV_SYN, dev->input_dev->evbit);
 	set_bit(EV_KEY, dev->input_dev->evbit);
 	set_bit(BTN_TOUCH, dev->input_dev->keybit);
 	set_bit(BTN_2, dev->input_dev->keybit);
+	set_bit(KEY_HOME, dev->input_dev->keybit); // for virtualkeys
 	set_bit(EV_ABS, dev->input_dev->evbit);
 
 	rc = input_register_device(dev->input_dev);
