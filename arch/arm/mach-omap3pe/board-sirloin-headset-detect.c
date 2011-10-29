@@ -28,6 +28,9 @@
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
 #include <linux/input.h>
+#if defined(CONFIG_SWITCH) && defined(CONFIG_ANDROID)
+#include <linux/switch.h>
+#endif
 
 #include <asm/io.h>
 #include <asm/hardware.h>
@@ -61,6 +64,15 @@
 #define HS_TURNON_DELAY            40 /* time to wait for hardware to settle before powering amplifier */
 
 #define INPUT_DEVICE_PHYS   "headset/input0"
+
+#if defined(CONFIG_SWITCH) && defined(CONFIG_ANDROID)
+#define SET_SWITCH_STATE(dev, type) switch_set_state(dev, type)
+#define SWITCH_NO_HEADSET        (0)
+#define SWITCH_HEADSET_NO_MIC    (1 << 1)
+#define SWITCH_HEADSET_WITH_MIC  (1 << 0)
+#else
+#define SET_SWITCH_STATE(dev, type)
+#endif
 
 #define DEBUG
 
@@ -116,6 +128,11 @@ struct headset_device {
 	int last_polled_button;
 };
 
+#if defined(CONFIG_SWITCH) && defined(CONFIG_ANDROID)
+struct switch_dev switch_jack_detection = {
+	.name = "h2w",
+};
+#endif
 
 static void headset_amp_enable(struct headset_device *dev, int enable)
 {
@@ -245,6 +262,7 @@ static void headset_mic_detect_handler(struct delayed_work *work)
 
 		if (dev->mic_present) {
 			input_report_switch(dev->idev, SW_HEADPHONE_MIC_INSERT, 1);
+			SET_SWITCH_STATE(&switch_jack_detection, SWITCH_HEADSET_WITH_MIC);
 			mod_timer(&dev->enable_headset_timer,
 				jiffies + msecs_to_jiffies(HS_TURNON_DELAY));
 			/* Report headset removed if headset is inserted then mic is found
@@ -294,9 +312,11 @@ static void headset_insert_handler(struct headset_device *dev)
 	if (dev->mic_present) {
 		twl4030_audio_mic_bias_enable(false);
 		input_report_switch(dev->idev, SW_HEADPHONE_MIC_INSERT, 1);
+		SET_SWITCH_STATE(&switch_jack_detection, SWITCH_HEADSET_WITH_MIC);
 		dev->checking_mic = false;
 	} else {
 		input_report_switch(dev->idev, SW_HEADPHONE_INSERT, 1);
+		SET_SWITCH_STATE(&switch_jack_detection, SWITCH_HEADSET_NO_MIC);
 		schedule_delayed_work(&dev->headset_mic_detect_work, msecs_to_jiffies(500));
 	}
 }
@@ -334,6 +354,7 @@ static void headset_remove_handler(struct headset_device *dev)
 	} else {
 		input_report_switch(dev->idev, SW_HEADPHONE_INSERT, 0);
 	}
+	SET_SWITCH_STATE(&switch_jack_detection, SWITCH_NO_HEADSET);
 
 	cancel_work_sync((struct work_struct *)&dev->headset_mic_detect_work);
 }
@@ -708,6 +729,16 @@ static int __init _headset_probe(struct platform_device *pdev)
 		twl4030_register_codec_event_callback(headset_codec_event, platform_get_drvdata(pdev));
 	}
 
+#if defined(CONFIG_SWITCH) && defined(CONFIG_ANDROID)
+	if (r == 0) {
+		r = switch_dev_register(&switch_jack_detection);
+		if (r < 0) {
+			printk(KERN_ERR "%s : Failed to register switch device\n", __func__);
+			return r;
+		}
+	}
+#endif
+
 	return r;
 }
 
@@ -728,6 +759,10 @@ static int headset_remove(struct platform_device *pdev)
 	gpio_free(dev->gpio_hs_plug_in);
 	gpio_free(dev->gpio_hs_amp_sd_n);
 	gpio_free(dev->gpio_mic_ans_int);
+
+#if defined(CONFIG_SWITCH) && defined(CONFIG_ANDROID)
+	switch_dev_unregister(&switch_jack_detection);
+#endif
 
 	return 0;
 }
