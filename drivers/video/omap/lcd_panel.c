@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/console.h>
+#include <linux/earlysuspend.h>
 
 #include <asm/arch/hardware.h>
 #include <asm/arch/board.h>
@@ -69,6 +70,9 @@ struct lcd_params {
 	int panel_state;
 
 	struct mutex ops_lock;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend early_suspend;
+#endif
 };
 
 #if defined(CONFIG_MACH_FLANK) || defined(CONFIG_MACH_SIRLOIN)
@@ -477,6 +481,26 @@ static int lcd_resume(struct platform_device *pdev)
 #define lcd_resume	NULL
 #endif
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+void lcd_early_suspend(struct early_suspend *h)
+{
+	struct lcd_params *params;
+
+	DPRINTK("%s: enter...\n", __func__);
+	params = container_of(h, struct lcd_params, early_suspend);
+	lcd_suspend(params->pdev, PMSG_SUSPEND);
+}
+
+void lcd_late_resume(struct early_suspend *h)
+{
+	struct lcd_params *params;
+
+	DPRINTK("%s: enter...\n", __func__);
+	params = container_of(h, struct lcd_params, early_suspend);
+	lcd_resume(params->pdev);
+}
+#endif
+
 static int lcd_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -528,6 +552,13 @@ static int lcd_probe(struct platform_device *pdev)
 		goto err1;
 	}
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	params->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+	params->early_suspend.suspend = lcd_early_suspend;
+	params->early_suspend.resume = lcd_late_resume;
+	register_early_suspend(&params->early_suspend);
+#endif
+
 	/* initialize to ON because it was turned on in Bootie */
 	// params->panel_state = DISPLAY_PANEL_STATE_ON;
 
@@ -577,8 +608,10 @@ static struct platform_driver lcd_driver = {
 	.probe = lcd_probe,
 	.remove = lcd_remove,
 	.shutdown = lcd_shutdown,
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend = lcd_suspend,
 	.resume = lcd_resume,
+#endif
 	.driver = {
 		   .name = "lcd",
 	},
