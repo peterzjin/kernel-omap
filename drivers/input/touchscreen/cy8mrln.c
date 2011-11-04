@@ -44,6 +44,7 @@
 #include <linux/miscdevice.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
+#include <linux/earlysuspend.h>
 #include <asm/arch/gpio.h>
 
 #undef  MODDEBUG
@@ -184,6 +185,9 @@ typedef struct tsc_drv_data {
 #ifdef CONFIG_ANDROID
 	struct input_dev		*input_dev;
 	struct tslib_cy8mrln_palmpre	*tslib_priv;
+#endif
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend		early_suspend;
 #endif
 #ifdef CONFIG_HIGH_RES_TIMERS
 	struct hrtimer			scan_timer;
@@ -1674,6 +1678,27 @@ end:
 
 #endif /* CONFIG_PM */
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void cy8mrln_early_suspend(struct early_suspend *h)
+{
+	struct tsc_drv_data *dev;
+
+	PDBG("%s: enter...\n", __func__);
+
+	dev = container_of(h, struct tsc_drv_data, early_suspend);
+	cy8mrln_suspend(dev->spidev, PMSG_SUSPEND);
+}
+
+static void cy8mrln_late_resume(struct early_suspend *h)
+{
+	struct tsc_drv_data *dev;
+
+	PDBG("%s: enter...\n", __func__);
+
+	dev = container_of(h, struct tsc_drv_data, early_suspend);
+	cy8mrln_resume(dev->spidev);
+}
+#endif
 
 static ssize_t 
 cy8mrln_read(struct file *file, char __user *buf, size_t count, 
@@ -4627,6 +4652,13 @@ cy8mrln_probe(struct spi_device *spi)
 	}
 #endif
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	dev->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	dev->early_suspend.suspend = cy8mrln_early_suspend;
+	dev->early_suspend.resume = cy8mrln_late_resume;
+	register_early_suspend(&dev->early_suspend);
+#endif
+
 	return 0;
 
 err4:
@@ -4646,8 +4678,10 @@ static struct spi_driver cy8mrln_driver = {
 		.bus    = &spi_bus_type,
 		.owner  = THIS_MODULE,
 	},
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend    = cy8mrln_suspend,
 	.resume     = cy8mrln_resume,
+#endif
 	.probe      = cy8mrln_probe,
 	.remove     = __devexit_p(cy8mrln_remove),
 };
