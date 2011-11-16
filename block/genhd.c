@@ -561,6 +561,8 @@ static int block_uevent(struct kset *kset, struct kobject *kobj,
 
 	add_uevent_var(env, "MAJOR=%u", disk->major);
 
+	add_uevent_var(env, "DEVTYPE=disk");
+
 	/* add physical device, backing this device  */
 	physdev = disk->driverfs_dev;
 	if (physdev) {
