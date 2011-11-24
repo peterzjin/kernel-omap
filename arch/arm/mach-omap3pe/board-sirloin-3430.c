@@ -1386,20 +1386,12 @@ static struct controller_platform_data board_lcd_controller_data = {
 		.yres_virtual 	= (480 * 3),	/* triple buffering */
 		.xoffset 	= 0,
 		.yoffset 	= 0,
-#ifdef CONFIG_ANDROID
-		.bits_per_pixel = 16,
-		.grayscale      = 0,
-		.red            = {11, 5, 0},
-		.green          = {5, 6, 0},
-		.blue           = {0, 5, 0},
-#else
 		.bits_per_pixel = 32,
 		.grayscale 	= 0,
 		.red 		= {16, 8, 0},
 		.green 		= {8, 8, 0},
 		.blue 		= {0, 8, 0},
 		.transp 	= {24, 8, 0},
-#endif
 		.nonstd 	= 0,
 		.activate 	= FB_ACTIVATE_NOW,
 		.height 	= -1,
