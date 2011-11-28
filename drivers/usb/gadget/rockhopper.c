@@ -76,7 +76,7 @@ extern char *nduid_string_get(void);
 #include "rndis.c"
 #include "u_ether.c"
 
-#include "f_mass_storage.c"
+#include "f_mass_storage_rh.c"
 
 #include "f_acm.c"
 #include "f_racm.c"

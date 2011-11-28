@@ -88,7 +88,7 @@
 #include <linux/usb/gadget_event.h>
 #endif
 
-#include "f_mass_storage.h"
+#include "f_mass_storage_rh.h"
 #include "gadget_chips.h"
 
 
