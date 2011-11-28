@@ -78,17 +78,11 @@
 #ifdef CONFIG_USB_FILE_STORAGE_MEDIASYNC
 #include <linux/vmalloc.h>
 #endif
-#ifdef CONFIG_USB_ANDROID
-#include <linux/platform_device.h>
-#endif
 
 #include <linux/usb_usual.h>
 #include <linux/usb/ch9.h>
 #include <linux/usb/composite.h>
 #include <linux/usb/gadget.h>
-#ifdef CONFIG_USB_ANDROID
-#include <linux/usb/android.h>
-#endif
 
 #ifdef CONFIG_USB_GADGET_EVENT
 #include <linux/usb/gadget_event.h>
@@ -315,11 +309,6 @@ enum data_direction {
 
 struct fsg_dev {
 	struct usb_function function;
-
-#ifdef CONFIG_USB_ANDROID
-	/* optional "usb_mass_storage" platform device */
-	struct platform_device *pdev;
-#endif
 
 	/* lock protects: state and all the req_busy's */
 	spinlock_t		lock;
@@ -2375,12 +2364,8 @@ static int get_next_command(struct fsg_dev *fsg)
 	/* Wait for the CBW to arrive */
 	while (bh->state != BUF_STATE_FULL) {
 		rc = sleep_thread(fsg);
-		if (rc) {
-			usb_ep_dequeue(fsg->bulk_out, bh->outreq);
-			bh->outreq_busy = 0;
-			bh->state = BUF_STATE_EMPTY;
+		if (rc)
 			return rc;
-		}
 	}
 	smp_rmb();
 	rc = received_cbw(fsg, bh);
@@ -2431,21 +2416,10 @@ static int do_set_interface(struct fsg_dev *fsg, int altsetting)
 		FSG_DBG(fsg, "reset interface\n");
 
 reset:
-	 /* Disable the endpoints */
-        if (fsg->bulk_in_enabled) {
-                DBG(fsg, "usb_ep_disable %s\n", fsg->bulk_in->name);
-                usb_ep_disable(fsg->bulk_in);
-                fsg->bulk_in_enabled = 0;
-        }
-        if (fsg->bulk_out_enabled) {
-                DBG(fsg, "usb_ep_disable %s\n", fsg->bulk_out->name);
-                usb_ep_disable(fsg->bulk_out);
-                fsg->bulk_out_enabled = 0;
-        }
-
 	/* Deallocate the requests */
 	for (i = 0; i < NUM_BUFFERS; ++i) {
 		struct fsg_buffhd *bh = &fsg->buffhds[i];
+
 		if (bh->inreq) {
 			usb_ep_free_request(fsg->bulk_in, bh->inreq);
 			bh->inreq = NULL;
@@ -2454,6 +2428,18 @@ reset:
 			usb_ep_free_request(fsg->bulk_out, bh->outreq);
 			bh->outreq = NULL;
 		}
+	}
+
+	/* Disable the endpoints */
+	if (fsg->bulk_in_enabled) {
+		FSG_DBG(fsg, "usb_ep_disable %s\n", fsg->bulk_in->name);
+		usb_ep_disable(fsg->bulk_in);
+		fsg->bulk_in_enabled = 0;
+	}
+	if (fsg->bulk_out_enabled) {
+		FSG_DBG(fsg, "usb_ep_disable %s\n", fsg->bulk_out->name);
+		usb_ep_disable(fsg->bulk_out);
+		fsg->bulk_out_enabled = 0;
 	}
 
 	fsg->running = 0;
@@ -2541,11 +2527,25 @@ static int do_set_config(struct fsg_dev *fsg, u8 new_config)
 	if (fsg->config != 0) {
 		FSG_DBG(fsg, "reset config\n");
 		fsg->config = 0;
+		rc = do_set_interface(fsg, -1);
 	}
 
 	/* Enable the interface */
-	if (new_config != 0)
+	if (new_config != 0) {
 		fsg->config = new_config;
+		rc = do_set_interface(fsg, 0);
+		if (rc != 0)
+			fsg->config = 0;	/* Reset on errors */
+		else
+#if 0
+			/* new_config is always 1 (see fsg_function_set_all)
+			   so printing the value here is confusing - TK
+			 */
+			FSG_INFO(fsg, "config #%d\n", fsg->config);
+#else
+			FSG_INFO(fsg, "mass_storage ready\n");
+#endif
+	}
 
 #ifdef USE_SWITCH_DEVICE
 	switch_set_state(&fsg->sdev, new_config);
@@ -2710,10 +2710,6 @@ static void handle_exception(struct fsg_dev *fsg)
 
 	case FSG_STATE_EXIT:
 	case FSG_STATE_TERMINATED:
-		if (new_config)  {
-			fsg->new_config = 0;
-			do_set_interface(fsg, -1);
-		}
 		do_set_config(fsg, 0);			// Free resources
 		spin_lock_irq(&fsg->lock);
 		fsg->state = FSG_STATE_TERMINATED;	// Stop the thread
@@ -3425,10 +3421,6 @@ fsg_function_unbind(struct usb_configuration *c, struct usb_function *f)
 #ifdef CONFIG_USB_GADGET_EVENT
 	gadget_event_enable_storage_events(0);
 #endif
-
-#ifdef USE_SWITCH_DEVICE
-	switch_dev_unregister(&fsg->sdev);
-#endif
 }
 
 static int __init
@@ -3473,15 +3465,7 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 		curlun = &fsg->luns[i];
 		curlun->ro = 0;
 		curlun->dev.release = lun_release;
-#ifdef CONFIG_USB_ANDROID
-		/* use "usb_mass_storage" platform device as parent if available */
-		if (fsg->pdev)
-			curlun->dev.parent = &fsg->pdev->dev;
-		else
-			curlun->dev.parent = &cdev->gadget->dev;
-#else
 		curlun->dev.parent = &cdev->gadget->dev;
-#endif
 		dev_set_drvdata(&curlun->dev, fsg);
 		snprintf(curlun->dev.bus_id, BUS_ID_SIZE,
 				"gadget-lun%d", i);
@@ -3637,7 +3621,6 @@ static int fsg_function_set_alt_async(struct usb_function *f,
 	struct fsg_dev	*fsg = fsg_func_to_dev(f);
 	FSG_DBG(fsg, "fsg_function_set_alt_async intf: %d alt: %d\n", intf, alt);
 	fsg->new_config = 1;
-	do_set_interface(fsg, 0);
 	raise_exception(fsg, FSG_STATE_CONFIG_CHANGE);
 #ifdef CONFIG_USB_GADGET_EVENT
 	gadget_event_host_connected_async(1, 0);
@@ -3649,8 +3632,6 @@ static void fsg_function_disable(struct usb_function *f)
 {
 	struct fsg_dev	*fsg = fsg_func_to_dev(f);
 	FSG_DBG(fsg, "fsg_function_disable\n");
-	if (fsg->new_config)
-		do_set_interface(fsg, -1);
 	fsg->new_config = 0;
 	raise_exception(fsg, FSG_STATE_DISCONNECT);
 #ifdef CONFIG_USB_GADGET_EVENT
@@ -3665,35 +3646,6 @@ static void fsg_function_suspend(struct usb_function *f)
 static void fsg_function_resume(struct usb_function *f)
 {
 }
-
-#ifdef CONFIG_USB_ANDROID
-static int __init fsg_probe(struct platform_device *pdev)
-{
-	struct usb_mass_storage_platform_data *pdata = pdev->dev.platform_data;
-	struct fsg_dev *fsg = the_fsg;
-
-	fsg->pdev = pdev;
-	printk(KERN_INFO "fsg_probe pdata: %p\n", pdata);
-
-	if (pdata) {
-		if (pdata->vendor)
-			fsg->vendor = pdata->vendor;
-
-		if (pdata->product)
-			fsg->product = pdata->product;
-
-		if (pdata->release)
-			fsg->release = pdata->release;
-	}
-
-	return 0;
-}
-
-static struct platform_driver fsg_platform_driver = {
-	.driver = { .name = "usb_mass_storage", },
-	.probe = fsg_probe,
-};
-#endif
 
 int __init mass_storage_function_add(struct usb_configuration *c, int nluns)
 {
@@ -3722,12 +3674,6 @@ int __init mass_storage_function_add(struct usb_configuration *c, int nluns)
 		goto err_switch_dev_register;
 #endif
 
-#ifdef CONFIG_USB_ANDROID
-	rc = platform_driver_register(&fsg_platform_driver);
-	if (rc != 0)
-		goto err_platform_driver_register;
-#endif
-
 #ifdef USE_WAKELOCK
 	wake_lock_init(&the_fsg->wake_lock, WAKE_LOCK_SUSPEND,
 		       "usb_mass_storage");
@@ -3747,14 +3693,9 @@ int __init mass_storage_function_add(struct usb_configuration *c, int nluns)
 	if (rc != 0)
 		goto err_usb_add_function;
 
-
 	return 0;
 
 err_usb_add_function:
-#ifdef CONFIG_USB_ANDROID
-	platform_driver_unregister(&fsg_platform_driver);
-err_platform_driver_register:
-#endif
 #ifdef USE_SWITCH_DEVICE
 	switch_dev_unregister(&the_fsg->sdev);
 err_switch_dev_register:

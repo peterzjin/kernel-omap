@@ -67,6 +67,7 @@ static const char longname[] = "Gadget Android";
 #define ADB_PRODUCT_ID	0x0002
 
 struct android_dev {
+	struct usb_gadget *gadget;
 	struct usb_composite_dev *cdev;
 
 	int product_id;
@@ -116,16 +117,6 @@ static struct usb_device_descriptor device_desc = {
 	.bNumConfigurations   = 1,
 };
 
-void android_usb_set_connected(int connected)
-{
-	if (_android_dev && _android_dev->cdev && _android_dev->cdev->gadget) {
-		if (connected)
-			usb_gadget_connect(_android_dev->cdev->gadget);
-		else
-			usb_gadget_disconnect(_android_dev->cdev->gadget);
-	}
-}
-
 static int __init android_bind_config(struct usb_configuration *c)
 {
 	struct android_dev *dev = _android_dev;
@@ -141,28 +132,10 @@ static int __init android_bind_config(struct usb_configuration *c)
 static struct usb_configuration android_config __initdata = {
 	.label		= "android",
 	.bind		= android_bind_config,
-	.setup		= android_setup_config,
 	.bConfigurationValue = 1,
 	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
-	.bMaxPower	= 0xFA, /* 500ma */
+	.bMaxPower	= 0x80, /* 250ma */
 };
-
-static int android_setup_config(struct usb_configuration *c,
-		const struct usb_ctrlrequest *ctrl)
-{
-	int i;
-	int ret = -EOPNOTSUPP;
-
-	for (i = 0; i < android_config_driver.next_interface_id; i++) {
-		if (android_config_driver.interface[i]->setup) {
-			ret = android_config_driver.interface[i]->setup(
-				android_config_driver.interface[i], ctrl);
-			if (ret >= 0)
-				return ret;
-		}
-	}
-	return ret;
-}
 
 static int __init android_bind(struct usb_composite_dev *cdev)
 {
@@ -281,7 +254,7 @@ static int adb_enable_release(struct inode *ip, struct file *fp)
 	return 0;
 }
 
-static const struct file_operations adb_enable_fops = {
+static struct file_operations adb_enable_fops = {
 	.owner =   THIS_MODULE,
 	.open =    adb_enable_open,
 	.release = adb_enable_release,
