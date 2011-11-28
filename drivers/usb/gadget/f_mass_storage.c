@@ -720,7 +720,7 @@ static void start_transfer(struct fsg_dev *fsg, struct usb_ep *ep,
 		 * submissions if DMA is enabled. */
 		if (rc != -ESHUTDOWN && !(rc == -EOPNOTSUPP &&
 						req->length == 0))
-			WARN(fsg, "error in submission: %s --> %d\n",
+			WARNING(fsg, "error in submission: %s --> %d\n",
 				(ep == fsg->bulk_in ? "bulk-in" : "bulk-out"),
 				rc);
 	}
@@ -2520,7 +2520,7 @@ static void close_backing_file(struct fsg_dev *fsg, struct lun *curlun)
 		 * our pages get synced to disk.
 		 * Also drop caches here just to be extra-safe
 		 */
-		rc = vfs_fsync(curlun->filp, curlun->filp->f_path.dentry, 1);
+		rc = do_fsync(curlun->filp, 1);
 		if (rc < 0)
 			printk(KERN_ERR "ums: Error syncing data (%d)\n", rc);
 		/* drop_pagecache and drop_slab are no longer available */
@@ -2552,7 +2552,8 @@ static ssize_t show_file(struct device *dev, struct device_attribute *attr,
 
 	down_read(&fsg->filesem);
 	if (backing_file_is_open(curlun)) {	/* Get the complete pathname */
-		p = d_path(&curlun->filp->f_path, buf, PAGE_SIZE - 1);
+		p = d_path(curlun->filp->f_path.dentry,
+				curlun->filp->f_path.mnt, buf, PAGE_SIZE - 1);
 		if (IS_ERR(p))
 			rc = PTR_ERR(p);
 		else {
@@ -2816,7 +2817,8 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 		if (backing_file_is_open(curlun)) {
 			p = NULL;
 			if (pathbuf) {
-				p = d_path(&curlun->filp->f_path,
+				p = d_path(curlun->filp->f_path.dentry,
+					   curlun->filp->f_path.mnt,
 					   pathbuf, PATH_MAX);
 				if (IS_ERR(p))
 					p = NULL;
