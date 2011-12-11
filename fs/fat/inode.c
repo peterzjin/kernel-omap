@@ -37,6 +37,90 @@
 static int fat_default_codepage = CONFIG_FAT_DEFAULT_CODEPAGE;
 static char fat_default_iocharset[] = CONFIG_FAT_DEFAULT_IOCHARSET;
 
+enum {
+	Opt_check_n, Opt_check_r, Opt_check_s, Opt_uid, Opt_gid,
+	Opt_umask, Opt_dmask, Opt_fmask, Opt_codepage, Opt_usefree, Opt_nocase,
+	Opt_quiet, Opt_showexec, Opt_debug, Opt_immutable,
+	Opt_dots, Opt_nodots,
+	Opt_charset, Opt_shortname_lower, Opt_shortname_win95,
+	Opt_shortname_winnt, Opt_shortname_mixed, Opt_utf8_no, Opt_utf8_yes,
+	Opt_uni_xl_no, Opt_uni_xl_yes, Opt_nonumtail_no, Opt_nonumtail_yes,
+	Opt_obsolate, Opt_flush,
+	Opt_err_cont, Opt_err_panic, Opt_err_ro, Opt_err,
+};
+
+static match_table_t fat_tokens = {
+	{Opt_check_r, "check=relaxed"},
+	{Opt_check_s, "check=strict"},
+	{Opt_check_n, "check=normal"},
+	{Opt_check_r, "check=r"},
+	{Opt_check_s, "check=s"},
+	{Opt_check_n, "check=n"},
+	{Opt_uid, "uid=%u"},
+	{Opt_gid, "gid=%u"},
+	{Opt_umask, "umask=%o"},
+	{Opt_dmask, "dmask=%o"},
+	{Opt_fmask, "fmask=%o"},
+	{Opt_codepage, "codepage=%u"},
+	{Opt_usefree, "usefree"},
+	{Opt_nocase, "nocase"},
+	{Opt_quiet, "quiet"},
+	{Opt_showexec, "showexec"},
+	{Opt_debug, "debug"},
+	{Opt_immutable, "sys_immutable"},
+	{Opt_err_cont, "errors=continue"},
+	{Opt_err_panic, "errors=panic"},
+	{Opt_err_ro, "errors=remount-ro"},
+	{Opt_obsolate, "conv=binary"},
+	{Opt_obsolate, "conv=text"},
+	{Opt_obsolate, "conv=auto"},
+	{Opt_obsolate, "conv=b"},
+	{Opt_obsolate, "conv=t"},
+	{Opt_obsolate, "conv=a"},
+	{Opt_obsolate, "fat=%u"},
+	{Opt_obsolate, "blocksize=%u"},
+	{Opt_obsolate, "cvf_format=%20s"},
+	{Opt_obsolate, "cvf_options=%100s"},
+	{Opt_obsolate, "posix"},
+	{Opt_flush, "flush"},
+	{Opt_err, NULL},
+};
+static match_table_t msdos_tokens = {
+	{Opt_nodots, "nodots"},
+	{Opt_nodots, "dotsOK=no"},
+	{Opt_dots, "dots"},
+	{Opt_dots, "dotsOK=yes"},
+	{Opt_err, NULL}
+};
+static match_table_t vfat_tokens = {
+	{Opt_charset, "iocharset=%s"},
+	{Opt_shortname_lower, "shortname=lower"},
+	{Opt_shortname_win95, "shortname=win95"},
+	{Opt_shortname_winnt, "shortname=winnt"},
+	{Opt_shortname_mixed, "shortname=mixed"},
+	{Opt_utf8_no, "utf8=0"},		/* 0 or no or false */
+	{Opt_utf8_no, "utf8=no"},
+	{Opt_utf8_no, "utf8=false"},
+	{Opt_utf8_yes, "utf8=1"},		/* empty or 1 or yes or true */
+	{Opt_utf8_yes, "utf8=yes"},
+	{Opt_utf8_yes, "utf8=true"},
+	{Opt_utf8_yes, "utf8"},
+	{Opt_uni_xl_no, "uni_xlate=0"},		/* 0 or no or false */
+	{Opt_uni_xl_no, "uni_xlate=no"},
+	{Opt_uni_xl_no, "uni_xlate=false"},
+	{Opt_uni_xl_yes, "uni_xlate=1"},	/* empty or 1 or yes or true */
+	{Opt_uni_xl_yes, "uni_xlate=yes"},
+	{Opt_uni_xl_yes, "uni_xlate=true"},
+	{Opt_uni_xl_yes, "uni_xlate"},
+	{Opt_nonumtail_no, "nonumtail=0"},	/* 0 or no or false */
+	{Opt_nonumtail_no, "nonumtail=no"},
+	{Opt_nonumtail_no, "nonumtail=false"},
+	{Opt_nonumtail_yes, "nonumtail=1"},	/* empty or 1 or yes or true */
+	{Opt_nonumtail_yes, "nonumtail=yes"},
+	{Opt_nonumtail_yes, "nonumtail=true"},
+	{Opt_nonumtail_yes, "nonumtail"},
+	{Opt_err, NULL}
+};
 
 static int fat_add_cluster(struct inode *inode)
 {
@@ -534,6 +618,68 @@ static int fat_remount(struct super_block *sb, int *flags, char *data)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	*flags |= MS_NODIRATIME | (sbi->options.isvfat ? 0 : MS_NOATIME);
+
+	/* Some hack here */
+	{
+		char *p;
+		int option;
+		char *options = data;
+		struct inode *root_inode;
+		substring_t args[MAX_OPT_ARGS];
+		struct fat_mount_options *opts = &sbi->options;
+
+		if (!options || !(sb->s_root) || !(sb->s_root->d_inode))
+			return 0;
+
+		printk(KERN_INFO "%s: data[%s]\n", __func__, data);
+
+		root_inode = sb->s_root->d_inode;
+		while ((p = strsep(&options, ",")) != NULL) {
+			int token;
+			if (!*p)
+				continue;
+
+			token = match_token(p, fat_tokens, args);
+			if (token == Opt_err)
+				token = match_token(p, vfat_tokens, args);
+
+			switch (token) {
+			case Opt_uid:
+				if (match_int(&args[0], &option))
+					return 0;
+				opts->fs_uid = option;
+				root_inode->i_uid = option;
+				break;
+			case Opt_gid:
+				if (match_int(&args[0], &option))
+					return 0;
+				opts->fs_gid = option;
+				root_inode->i_gid = option;
+				break;
+			case Opt_umask:
+				if (match_octal(&args[0], &option))
+					return 0;
+				opts->fs_fmask = opts->fs_dmask = option;
+				root_inode->i_mode =
+					(S_IRWXUGO & ~sbi->options.fs_dmask) | S_IFDIR;
+				break;
+			case Opt_dmask:
+				if (match_octal(&args[0], &option))
+					return 0;
+				opts->fs_dmask = option;
+				root_inode->i_mode =
+					(S_IRWXUGO & ~sbi->options.fs_dmask) | S_IFDIR;
+				break;
+			case Opt_fmask:
+				if (match_octal(&args[0], &option))
+					return 0;
+				opts->fs_fmask = option;
+				break;
+			default:
+				continue;
+			}
+		}
+	}
 	return 0;
 }
 
@@ -848,91 +994,6 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 
 	return 0;
 }
-
-enum {
-	Opt_check_n, Opt_check_r, Opt_check_s, Opt_uid, Opt_gid,
-	Opt_umask, Opt_dmask, Opt_fmask, Opt_codepage, Opt_usefree, Opt_nocase,
-	Opt_quiet, Opt_showexec, Opt_debug, Opt_immutable,
-	Opt_dots, Opt_nodots,
-	Opt_charset, Opt_shortname_lower, Opt_shortname_win95,
-	Opt_shortname_winnt, Opt_shortname_mixed, Opt_utf8_no, Opt_utf8_yes,
-	Opt_uni_xl_no, Opt_uni_xl_yes, Opt_nonumtail_no, Opt_nonumtail_yes,
-	Opt_obsolate, Opt_flush,
-	Opt_err_cont, Opt_err_panic, Opt_err_ro, Opt_err,
-};
-
-static match_table_t fat_tokens = {
-	{Opt_check_r, "check=relaxed"},
-	{Opt_check_s, "check=strict"},
-	{Opt_check_n, "check=normal"},
-	{Opt_check_r, "check=r"},
-	{Opt_check_s, "check=s"},
-	{Opt_check_n, "check=n"},
-	{Opt_uid, "uid=%u"},
-	{Opt_gid, "gid=%u"},
-	{Opt_umask, "umask=%o"},
-	{Opt_dmask, "dmask=%o"},
-	{Opt_fmask, "fmask=%o"},
-	{Opt_codepage, "codepage=%u"},
-	{Opt_usefree, "usefree"},
-	{Opt_nocase, "nocase"},
-	{Opt_quiet, "quiet"},
-	{Opt_showexec, "showexec"},
-	{Opt_debug, "debug"},
-	{Opt_immutable, "sys_immutable"},
-	{Opt_err_cont, "errors=continue"},
-	{Opt_err_panic, "errors=panic"},
-	{Opt_err_ro, "errors=remount-ro"},
-	{Opt_obsolate, "conv=binary"},
-	{Opt_obsolate, "conv=text"},
-	{Opt_obsolate, "conv=auto"},
-	{Opt_obsolate, "conv=b"},
-	{Opt_obsolate, "conv=t"},
-	{Opt_obsolate, "conv=a"},
-	{Opt_obsolate, "fat=%u"},
-	{Opt_obsolate, "blocksize=%u"},
-	{Opt_obsolate, "cvf_format=%20s"},
-	{Opt_obsolate, "cvf_options=%100s"},
-	{Opt_obsolate, "posix"},
-	{Opt_flush, "flush"},
-	{Opt_err, NULL},
-};
-static match_table_t msdos_tokens = {
-	{Opt_nodots, "nodots"},
-	{Opt_nodots, "dotsOK=no"},
-	{Opt_dots, "dots"},
-	{Opt_dots, "dotsOK=yes"},
-	{Opt_err, NULL}
-};
-static match_table_t vfat_tokens = {
-	{Opt_charset, "iocharset=%s"},
-	{Opt_shortname_lower, "shortname=lower"},
-	{Opt_shortname_win95, "shortname=win95"},
-	{Opt_shortname_winnt, "shortname=winnt"},
-	{Opt_shortname_mixed, "shortname=mixed"},
-	{Opt_utf8_no, "utf8=0"},		/* 0 or no or false */
-	{Opt_utf8_no, "utf8=no"},
-	{Opt_utf8_no, "utf8=false"},
-	{Opt_utf8_yes, "utf8=1"},		/* empty or 1 or yes or true */
-	{Opt_utf8_yes, "utf8=yes"},
-	{Opt_utf8_yes, "utf8=true"},
-	{Opt_utf8_yes, "utf8"},
-	{Opt_uni_xl_no, "uni_xlate=0"},		/* 0 or no or false */
-	{Opt_uni_xl_no, "uni_xlate=no"},
-	{Opt_uni_xl_no, "uni_xlate=false"},
-	{Opt_uni_xl_yes, "uni_xlate=1"},	/* empty or 1 or yes or true */
-	{Opt_uni_xl_yes, "uni_xlate=yes"},
-	{Opt_uni_xl_yes, "uni_xlate=true"},
-	{Opt_uni_xl_yes, "uni_xlate"},
-	{Opt_nonumtail_no, "nonumtail=0"},	/* 0 or no or false */
-	{Opt_nonumtail_no, "nonumtail=no"},
-	{Opt_nonumtail_no, "nonumtail=false"},
-	{Opt_nonumtail_yes, "nonumtail=1"},	/* empty or 1 or yes or true */
-	{Opt_nonumtail_yes, "nonumtail=yes"},
-	{Opt_nonumtail_yes, "nonumtail=true"},
-	{Opt_nonumtail_yes, "nonumtail"},
-	{Opt_err, NULL}
-};
 
 static int parse_options(char *options, int is_vfat, int silent, int *debug,
 			 struct fat_mount_options *opts)
