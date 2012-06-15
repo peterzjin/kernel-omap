@@ -97,6 +97,7 @@ obj-$(CONFIG_MACH_SHOLES)		+= board-sholes.o \
 					   board-sholes-mmcprobe.o \
 					   board-sholes-usbnet.o \
 
+obj-$(CONFIG_MACH_SIRLOIN)		+= board-sirloin.o
 obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o \
 					   board-rx51-sdram.o \
 					   board-rx51-peripherals.o \
