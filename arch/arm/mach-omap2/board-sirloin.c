@@ -160,6 +160,11 @@ static struct omap_opp sirloin_dsp_rate_table[] = {
 	{S430M, VDD1_OPP5, 0x3E},
 };
 
+void debug_rst()
+{
+	writel(0x4, OMAP3430_PRM_RSTCTRL);
+}
+
 static void __init sirloin_init_irq(void)
 {
 	omap2_init_common_hw(JEDEC_JESD209A_sdrc_params, NULL, 
