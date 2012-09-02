@@ -78,6 +78,10 @@
 #endif
 #endif
 
+#ifdef CONFIG_LEDS_LP8501
+#include <linux/leds-lp8501.h>
+#endif
+
 #define SIRLOIN_IPC_USB_SUSP_GPIO	142
 #define SIRLOIN_AP_TO_BP_FLASH_EN_GPIO	157
 #define SIRLOIN_TOUCH_RESET_N_GPIO	164
@@ -667,7 +671,102 @@ static struct lm3554_platform_data sirloin_camera_flash = {
 	.gpio_reg_def = 0x0,
 };
 
+#ifdef CONFIG_LEDS_LP8501
+/* Divides LED into group:
+ * group 1 for core navi LED: LED_1, LED_2
+ * group 2 for left white LED: LED_3
+ * group 3 for right white LED: LED_5
+ */
+static struct led_cfg core_navi_center_group[] = {
+	[0] = {
+		.type  = WHITE,
+		.pwm_addr = D2_PWM,
+		.current_addr = D2_CURRENT_CTRL,
+		.control_addr = D2_CONTROL,
+	},
+	[1] = {
+		.type  = WHITE,
+		.pwm_addr = D1_PWM,
+		.current_addr = D1_CURRENT_CTRL,
+		.control_addr = D1_CONTROL,
+	},
+};
+
+static struct led_cfg core_navi_right_group[] = {
+	[0] = {
+		.type = WHITE,
+		.pwm_addr = D3_PWM,
+		.current_addr = D3_CURRENT_CTRL,
+		.control_addr = D3_CONTROL,
+	},
+};
+
+static struct led_cfg core_navi_left_group[] = {
+	[0] = {
+		.type  = WHITE,
+		.pwm_addr = D5_PWM,
+		.current_addr = D5_CURRENT_CTRL,
+		.control_addr = D5_CONTROL,
+	},
+};
+
+static struct lp8501_led_config led_lp8501_data[] = {
+	[GRP_1] = {
+		.cdev = {
+			.name = "core_navi_center",
+		},
+		.led_list = &core_navi_center_group[0],
+		.nleds = ARRAY_SIZE(core_navi_center_group),
+		.group_id = GRP_1,
+		.hw_group = HW_GRP_NONE,
+		.default_brightness = 0,
+		.default_state = LED_OFF,
+	},
+	[GRP_2] = {
+		.cdev = {
+			.name = "core_navi_left",
+		},
+		.led_list = &core_navi_left_group[0],
+		.nleds = ARRAY_SIZE(core_navi_left_group),
+		.group_id = GRP_2,
+		.hw_group = HW_GRP_NONE,
+		.default_brightness = 0,
+		.default_state = LED_OFF,
+	},
+	[GRP_3] = {
+		.cdev = {
+			.name = "core_navi_right",
+		},
+		.led_list = &core_navi_right_group[0],
+		.nleds = ARRAY_SIZE(core_navi_right_group),
+		.group_id = GRP_3,
+		.hw_group = HW_GRP_NONE,
+		.default_brightness = 0,
+		.default_state = LED_OFF,
+	},
+};
+
+static struct lp8501_memory_config led_lp8501_memcfg = {
+	.eng1_startpage = 0,
+	.eng1_endpage = 1,
+	.eng2_startpage = 2,
+	.eng2_endpage = 3,
+	.eng3_startpage = 4,
+	.eng3_endpage = 5,
+};
+
+static struct lp8501_platform_data board_lp8501_data = {
+	.leds = led_lp8501_data,
+	.memcfg = &led_lp8501_memcfg,
+	.nleds = ARRAY_SIZE(led_lp8501_data),
+	.cp_mode = CONFIG_CPMODE_AUTO,
+	.power_mode = CONFIG_POWER_SAVE_ON,
+	.dev_name = "national_led",
+};
+#endif
+
 static struct i2c_board_info __initdata sirloin_i2c_bus1_board_info[] = {
+	/*
 	{
 		I2C_BOARD_INFO(QTOUCH_TS_NAME, 0x11),
 		.platform_data = &sirloin_ts_platform_data,
@@ -678,15 +777,16 @@ static struct i2c_board_info __initdata sirloin_i2c_bus1_board_info[] = {
 		.platform_data = &omap3430_als_light_data,
 		.irq = OMAP_GPIO_IRQ(SIRLOIN_LM_3530_INT_GPIO),
 	},
+	*/
 };
 
 //extern struct lis331dlh_platform_data sirloin_lis331dlh_data;
 static struct i2c_board_info __initdata sirloin_i2c_bus2_board_info[] = {
+	/*
 	{
 		I2C_BOARD_INFO("akm8973", 0x1C),
 		.irq = OMAP_GPIO_IRQ(SIRLOIN_AKM8973_INT_GPIO),
 	},
-	/*
 	{
 		I2C_BOARD_INFO("lis331dlh", 0x19),
 		.platform_data = &sirloin_lis331dlh_data,
@@ -695,11 +795,11 @@ static struct i2c_board_info __initdata sirloin_i2c_bus2_board_info[] = {
 };
 
 static struct i2c_board_info __initdata sirloin_i2c_bus3_board_info[] = {
+	/*
 	{
 		I2C_BOARD_INFO("lm3554_led", 0x53),
 		.platform_data = &sirloin_camera_flash,
 	},
-	/*
 #if defined(CONFIG_VIDEO_MT9P012) || defined(CONFIG_VIDEO_MT9P012_MODULE)
 	{
 		I2C_BOARD_INFO("mt9p012", 0x36),
@@ -713,6 +813,13 @@ static struct i2c_board_info __initdata sirloin_i2c_bus3_board_info[] = {
 	},
 #endif
 */
+#ifdef CONFIG_LEDS_LP8501
+	{
+		I2C_BOARD_INFO(LP8501_I2C_DEVICE, LP8501_I2C_ADDR),
+		.irq = OMAP_GPIO_IRQ(23),
+		.platform_data = &board_lp8501_data,
+	},
+#endif
 };
 
 static int __init sirloin_i2c_init(void)
@@ -1443,33 +1550,33 @@ static void __init sirloin_init(void)
 		pr_err("failed to create board_properties\n");
 
 	sirloin_ramconsole_init();
-	sirloin_omap_mdm_ctrl_init();
+	//sirloin_omap_mdm_ctrl_init();
 	//sirloin_spi_init();
 	//sirloin_flash_init();
 	sirloin_serial_init();
-	sirloin_als_init();
+	//sirloin_als_init();
 	//sirloin_panel_init();
 	//sirloin_sensors_init();
 	//sirloin_camera_init();
-	sirloin_touch_init();
-	sirloin_audio_init();
-	usb_musb_init();
-	sirloin_ehci_init();
-	sirloin_sdrc_init();
+	//sirloin_touch_init();
+	//sirloin_audio_init();
+	//usb_musb_init();
+	//sirloin_ehci_init();
+	//sirloin_sdrc_init();
 	sirloin_pm_init();
-	config_mmc2_init();
-	config_wlan_gpio();
-	omap_hdq_init();
-	sirloin_bt_init();
+	//config_mmc2_init();
+	//config_wlan_gpio();
+	//omap_hdq_init();
+	//sirloin_bt_init();
 #if SIRLOIN_MMCPROBE_ENABLED
-	sirloin_mmcprobe_init();
+	//sirloin_mmcprobe_init();
 #else
 	//sirloin_hsmmc_init();
 #endif
-	sirloin_vout_init();
-	sirloin_sgx_init();
+	//sirloin_vout_init();
+	//sirloin_sgx_init();
 	sirloin_power_off_init();
-	sirloin_gadget_init();
+	//sirloin_gadget_init();
 }
 
 static void __init sirloin_map_io(void)

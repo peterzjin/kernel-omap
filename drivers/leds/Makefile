@@ -37,6 +37,7 @@ obj-$(CONFIG_LEDS_SHOLES)		+= leds-ld-cpcap-disp.o \
 					   leds-ld-cpcap-kpad.o
 obj-$(CONFIG_LEDS_LM3530)		+= led-lm3530.o
 obj-$(CONFIG_LEDS_LM3554)		+= led-cpcap-lm3554.o
+obj-$(CONFIG_LEDS_LP8501)		+= leds-lp8501.o
 
 # LED Triggers
 obj-$(CONFIG_LEDS_TRIGGER_TIMER)	+= ledtrig-timer.o
