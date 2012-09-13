@@ -1433,8 +1433,8 @@ static void __init sirloin_vout_init(void)
 }
 
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
-#define RAM_CONSOLE_START   0x8E000000
-#define RAM_CONSOLE_SIZE    0x20000
+#define RAM_CONSOLE_START   0x8FF00000
+#define RAM_CONSOLE_SIZE    0x100000
 static struct resource ram_console_resource = {
        .start  = RAM_CONSOLE_START,
        .end    = (RAM_CONSOLE_START + RAM_CONSOLE_SIZE - 1),
