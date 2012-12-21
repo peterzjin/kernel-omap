@@ -678,6 +678,7 @@ void __init omap_serial_early_init(void)
 {
 }
 
+#ifdef CONFIG_SERIAL_OMAP
 void __init omap_serial_init(int wake_gpio_strobe,
 			     unsigned int wake_strobe_enable_mask)
 {
@@ -738,7 +739,6 @@ void __init omap_serial_init(int wake_gpio_strobe,
 	}
 }
 
-#ifdef CONFIG_SERIAL_OMAP
 static int __init omap_hs_init(void)
 {
 	int ret = 0;

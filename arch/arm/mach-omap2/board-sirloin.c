@@ -54,6 +54,7 @@
 #include <plat/hdq.h>
 #include <linux/delay.h>
 #include <plat/control.h>
+#include <plat/vram.h>
 #include <mach/system.h>
 #include <linux/usb/android_composite.h>
 #include <linux/wakelock.h>
@@ -835,7 +836,7 @@ static int __init sirloin_i2c_init(void)
 
 arch_initcall(sirloin_i2c_init);
 
-//extern void __init sirloin_spi_init(void);
+extern void __init sirloin_spi_init(void);
 //extern void __init sirloin_flash_init(void);
 extern void __init sirloin_gpio_iomux_init(void);
 
@@ -1520,6 +1521,19 @@ static struct platform_driver cpcap_charger_connected_driver = {
 	},
 };
 
+static void __init sirloin_fixup(struct machine_desc *mdesc, struct tag *t,
+		char **from, struct meminfo *meminfo)
+{
+	for (; t->hdr.size; t = tag_next(t)) {
+		if (t->hdr.tag == ATAG_MEM &&
+				t->u.mem.size == MEMSIZE_BEFORE_FIXUP) {
+			t->u.mem.size = MEMSIZE_AFTER_FIXUP;
+			printk("fixup the memsize from 0x%x to 0x%x\n",
+				MEMSIZE_BEFORE_FIXUP, MEMSIZE_AFTER_FIXUP);
+		}
+	}
+}
+
 static void __init sirloin_power_off_init(void)
 {
 	gpio_request(SIRLOIN_POWER_OFF_GPIO, "sirloin power off");
@@ -1551,11 +1565,11 @@ static void __init sirloin_init(void)
 
 	sirloin_ramconsole_init();
 	//sirloin_omap_mdm_ctrl_init();
-	//sirloin_spi_init();
+	sirloin_spi_init();
 	//sirloin_flash_init();
 	sirloin_serial_init();
 	//sirloin_als_init();
-	//sirloin_panel_init();
+	sirloin_panel_init();
 	//sirloin_sensors_init();
 	//sirloin_camera_init();
 	//sirloin_touch_init();
@@ -1581,6 +1595,7 @@ static void __init sirloin_init(void)
 
 static void __init sirloin_map_io(void)
 {
+	omap_vram_set_sdram_vram(SIRLOIN_FBMEM_SIZE, SIRLOIN_FBMEM_START);
 	omap2_ramconsole_reserve_sdram();
 	omap2_set_globals_343x();
 	omap2_map_common_io();
@@ -1598,5 +1613,6 @@ MACHINE_START(SIRLOIN, "sirloin")
 	.map_io		= sirloin_map_io,
 	.init_irq	= sirloin_init_irq,
 	.init_machine	= sirloin_init,
+	.fixup		= sirloin_fixup,
 	.timer		= &omap_timer,
 	MACHINE_END

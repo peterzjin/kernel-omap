@@ -30,4 +30,9 @@ config PANEL_SHOLES
         help
 	  LCD Panel used in sholes
 
+config PANEL_ACX567AKM
+        tristate "ACX567AKM Panel"
+        help
+	  LCD Panel used in sirloin
+
 endmenu

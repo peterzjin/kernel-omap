@@ -58,6 +58,12 @@ extern struct hplens_platform_data sirloin_hplens_platform_data;
 #define GPIO_SILENCE_KEY		100
 #define GPIO_SLIDER			177
 
+/* some hack for the vram */
+#define MEMSIZE_BEFORE_FIXUP 0x1f600000
+#define MEMSIZE_AFTER_FIXUP  0x1f900000
+#define SIRLOIN_FBMEM_SIZE   0x300000
+#define SIRLOIN_FBMEM_START  0x9f600000
+
 /*
 #define GPIO_SIGNAL_LCD_PANEL_RESET	92
 #define GPIO_SIGNAL_LCD_PANEL_SD	93
