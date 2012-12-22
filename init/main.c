@@ -404,6 +404,21 @@ static void __init setup_command_line(char *command_line)
 	strcpy (static_command_line, command_line);
 }
 
+static int __init kernel_rst(void * unused)
+{
+	extern void debug_rst(void);
+	int rst_time = 6000;
+
+	printk(KERN_ERR "will rst in %d ms\n", rst_time);
+
+	msleep(rst_time);
+
+	printk(KERN_ERR "to rst the device ....\n");
+	debug_rst();
+
+	return 0;
+}
+
 /*
  * We need to finalize in a non-__init function or else race conditions
  * between the root thread and the init thread may cause start_kernel to
@@ -420,6 +435,7 @@ static noinline void __init_refok rest_init(void)
 
 	rcu_scheduler_starting();
 	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
+	//kernel_thread(kernel_rst, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
 	pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
 	kthreadd_task = find_task_by_pid_ns(pid, &init_pid_ns);
