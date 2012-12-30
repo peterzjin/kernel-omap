@@ -1013,29 +1013,29 @@ static void __init sirloin_serial_init(void)
 /* SMPS I2C voltage control register Address for VDD1 */
 #define SIRLOIN_R_VDD1_SR_CONTROL		0x00
 /* SMPS I2C voltage control register Address for VDD2 */
-#define SIRLOIN_R_VDD2_SR_CONTROL		0x00
+#define SIRLOIN_R_VDD2_SR_CONTROL		0x01
 /* SMPS I2C Address for VDD1 */
-#define SIRLOIN_R_SRI2C_SLAVE_ADDR_SA0		0x1
+#define SIRLOIN_R_SRI2C_SLAVE_ADDR_SA0		0x12
 /* SMPS I2C Address for VDD2 */
-#define SIRLOIN_R_SRI2C_SLAVE_ADDR_SA1		0x2
+#define SIRLOIN_R_SRI2C_SLAVE_ADDR_SA1		0x12
 /* SMPS I2C voltage control register Address for VDD1, used for SR command */
-#define SIRLOIN_R_SMPS_VOL_CNTL_CMDRA0		0x01
+#define SIRLOIN_R_SMPS_VOL_CNTL_CMDRA0		0x00
 /* SMPS I2C voltage control register Address for VDD2, used for SR command */
 #define SIRLOIN_R_SMPS_VOL_CNTL_CMDRA1		0x01
 
 static struct prm_setup_vc sirloin_prm_setup = {
-	.clksetup = 0x4c,
-	.voltsetup_time1 = 0x94,
-	.voltsetup_time2 = 0x94,
-	.voltoffset = 0x0,
-	.voltsetup2 = 0x0,
-	.vdd0_on = 0x65,
-	.vdd0_onlp = 0x45,
-	.vdd0_ret = 0x19,
+	.clksetup = 0xff,
+	.voltsetup_time1 = 0xfff,
+	.voltsetup_time2 = 0xfff,
+	.voltoffset = 0xff,
+	.voltsetup2 = 0xff,
+	.vdd0_on = 0x30,
+	.vdd0_onlp = 0x20,
+	.vdd0_ret = 0x18,
 	.vdd0_off = 0x00,
-	.vdd1_on = 0x65,
-	.vdd1_onlp = 0x45,
-	.vdd1_ret = 0x19,
+	.vdd1_on = 0x30,
+	.vdd1_onlp = 0x20,
+	.vdd1_ret = 0x18,
 	.vdd1_off = 0x00,
 	.i2c_slave_ra = (SIRLOIN_R_SRI2C_SLAVE_ADDR_SA1 <<
 			OMAP3430_SMPS_SA1_SHIFT) |
@@ -1046,10 +1046,8 @@ static struct prm_setup_vc sirloin_prm_setup = {
 	/* vdd_vol_ra controls both cmd and vol, set the address equal */
 	.vdd_cmd_ra = (SIRLOIN_R_SMPS_VOL_CNTL_CMDRA1 << OMAP3430_CMDRA1_SHIFT) |
 		(SIRLOIN_R_SMPS_VOL_CNTL_CMDRA0 << OMAP3430_CMDRA0_SHIFT),
-	.vdd_ch_conf = OMAP3430_CMD1 | OMAP3430_RACEN0 |
-			OMAP3430_PRM_VC_CH_CONF_SA1 | OMAP3430_RACEN1 |
-			OMAP3430_RAV1 | OMAP3430_RAC1, OMAP3430_GR_MOD,
-	.vdd_i2c_cfg = OMAP3430_HSEN,
+	.vdd_ch_conf = OMAP3430_CMD1 | OMAP3430_RAV1,
+	.vdd_i2c_cfg = OMAP3430_MCODE_SHIFT,
 };
 
 #define R_SMPS_VOL_OPP1_RA0		0x02
@@ -1216,6 +1214,7 @@ static void sirloin_pm_init(void)
 {
 	sleep_while_idle = 1;
 	omap3_pm_init_vc(&sirloin_prm_setup);
+#if 0
 	omap3_voltagescale_vcbypass_setup(sirloin_voltagescale_vcbypass);
 
 	/* Initialize CPCAP SW1&SW2 OPP1&OPP2 registers */
@@ -1241,6 +1240,7 @@ static void sirloin_pm_init(void)
 
 	platform_device_register(&sirloin_bpwake_device);
 	platform_driver_register(&sirloin_bpwake_driver);
+#endif
 
 	/* set cold reset, will move to warm reset once ready */
 	sirloin_pm_set_reset(1);
