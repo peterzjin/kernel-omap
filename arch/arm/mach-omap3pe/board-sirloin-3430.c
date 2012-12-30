@@ -20,6 +20,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
+#include <linux/bootmem.h>
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <linux/input.h>
@@ -164,6 +165,31 @@ static int  __init board_args(char *str)
         return 0;
 }
 __setup("boardtype=", board_args);
+
+#define RAM_CONSOLE_START   0x8ff00000
+#define RAM_CONSOLE_SIZE    0x100000
+static struct resource ram_console_resource = {
+	.start  = RAM_CONSOLE_START,
+	.end    = (RAM_CONSOLE_START + RAM_CONSOLE_SIZE - 1),
+	.flags  = IORESOURCE_MEM,
+};
+
+static struct platform_device ram_console_device = {
+	.name = "ram_console",
+	.id = 0,
+	.num_resources  = 1,
+	.resource       = &ram_console_resource,
+};
+
+static inline void sirloin_ramconsole_init(void)
+{
+	platform_device_register(&ram_console_device);
+}
+
+static inline void sirloin_ramconsole_reserve_sdram(void)
+{
+	reserve_bootmem(RAM_CONSOLE_START, RAM_CONSOLE_SIZE);
+}
 
 /*
  *  UART support
@@ -2308,6 +2334,7 @@ static void __init machine_map_io ( void )
 {
 	omap2_set_globals_343x();
 	omap2_map_common_io();
+	sirloin_ramconsole_reserve_sdram();
 }
 
 /*
@@ -2711,6 +2738,8 @@ static void __init machine_init ( void )
 	/* set omap config */
 	omap_board_config      = board_config;
 	omap_board_config_size = ARRAY_SIZE(board_config);
+
+	sirloin_ramconsole_init();
 
 	/* Serial */
 	omap_serial_init();
