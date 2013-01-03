@@ -99,6 +99,7 @@ obj-$(CONFIG_MACH_SHOLES)		+= board-sholes.o \
 
 obj-$(CONFIG_MACH_SIRLOIN)		+= board-sirloin.o \
 					   board-sirloin-panel.o \
+					   board-sirloin-hsmmc.o \
 					   board-sirloin-spi.o
 obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o \
 					   board-rx51-sdram.o \

@@ -1585,7 +1585,7 @@ static void __init sirloin_init(void)
 #if SIRLOIN_MMCPROBE_ENABLED
 	//sirloin_mmcprobe_init();
 #else
-	//sirloin_hsmmc_init();
+	sirloin_hsmmc_init();
 #endif
 	//sirloin_vout_init();
 	//sirloin_sgx_init();
