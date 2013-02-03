@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Thu Jan  3 21:11:11 2013
+# Sun Feb  3 17:59:07 2013
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -814,6 +814,7 @@ CONFIG_UID_STAT=y
 CONFIG_APANIC=y
 CONFIG_APANIC_PLABEL="kpanic"
 # CONFIG_VIB_OMAP_PWM is not set
+CONFIG_KERNEL_LOG=y
 # CONFIG_C2PORT is not set
 
 #

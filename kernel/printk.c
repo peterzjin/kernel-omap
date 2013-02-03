@@ -36,6 +36,10 @@
 
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_KERNEL_LOG
+#include <linux/klog.h>
+#endif
+
 /*
  * for_each_console() allows you to iterate on each console
  */
@@ -767,6 +771,9 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 
 #ifdef	CONFIG_DEBUG_LL
 	printascii(printk_buf);
+#endif
+#ifdef CONFIG_KERNEL_LOG
+	klog_write(printk_buf, printed_len);
 #endif
 
 	p = printk_buf;
