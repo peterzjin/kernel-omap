@@ -37,6 +37,8 @@
 #include <linux/wl127x-rfkill.h>
 #include <linux/wl127x-test.h>
 #include <linux/omap_mdm_ctrl.h>
+#include <linux/i2c.h>
+#include <linux/i2c/twl4030.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -396,7 +398,7 @@ static void sirloin_gadget_init(void)
 		platform_device_register(&rndis_device);
 #endif
 	platform_device_register(&androidusb_device);
-	platform_driver_register(&cpcap_usb_connected_driver);
+	//platform_driver_register(&cpcap_usb_connected_driver);
 }
 
 static void sirloin_audio_init(void)
@@ -766,6 +768,33 @@ static struct lp8501_platform_data board_lp8501_data = {
 };
 #endif
 
+static struct twl4030_usb_data sirloin_usb_data = {
+	.usb_mode= T2_USB_MODE_ULPI,
+};
+
+static struct twl4030_platform_data sirloin_twldata __initdata = {
+	.irq_base= TWL4030_IRQ_BASE,
+	.irq_end= TWL4030_IRQ_END,
+
+	/* platform_data for children goes here */
+#if 0
+	.gpio_= &sirloin_gpio_data,
+	.keypad= &sirloin_kp_data,
+	.madc= &sirloin_madc_data,
+#endif
+	.usb= &sirloin_usb_data,
+#if 0
+	.power= &sirloin_t2scripts_data,
+
+	.vaux1= &sirloin_vaux1,
+	.vaux2= &sirloin_vaux2,
+	.vaux4= &sirloin_vaux4,
+	.vmmc1= &sirloin_vmmc1,
+	.vsim= &sirloin_vsim,
+	.vdac= &sirloin_vdac,
+#endif
+};
+
 static struct i2c_board_info __initdata sirloin_i2c_bus1_board_info[] = {
 	/*
 	{
@@ -779,6 +808,12 @@ static struct i2c_board_info __initdata sirloin_i2c_bus1_board_info[] = {
 		.irq = OMAP_GPIO_IRQ(SIRLOIN_LM_3530_INT_GPIO),
 	},
 	*/
+	{
+		I2C_BOARD_INFO("twl4030", 0x48),
+		.flags = I2C_CLIENT_WAKE,
+		.irq = INT_34XX_SYS_NIRQ,
+		.platform_data = &sirloin_twldata,
+	},
 };
 
 //extern struct lis331dlh_platform_data sirloin_lis331dlh_data;
@@ -1545,7 +1580,7 @@ static void __init sirloin_power_off_init(void)
 	omap_writew(0x1F, 0x480021D2);
 	pm_power_off = sirloin_pm_power_off;
 
-	platform_driver_register(&cpcap_charger_connected_driver);
+	//platform_driver_register(&cpcap_charger_connected_driver);
 }
 
 static void __init sirloin_init(void)
@@ -1574,7 +1609,7 @@ static void __init sirloin_init(void)
 	//sirloin_camera_init();
 	//sirloin_touch_init();
 	//sirloin_audio_init();
-	//usb_musb_init();
+	usb_musb_init();
 	//sirloin_ehci_init();
 	//sirloin_sdrc_init();
 	sirloin_pm_init();
@@ -1590,7 +1625,7 @@ static void __init sirloin_init(void)
 	//sirloin_vout_init();
 	//sirloin_sgx_init();
 	sirloin_power_off_init();
-	//sirloin_gadget_init();
+	sirloin_gadget_init();
 }
 
 static void __init sirloin_map_io(void)
