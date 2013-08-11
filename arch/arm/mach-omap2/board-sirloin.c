@@ -116,6 +116,13 @@
 
 #define SIRLOIN_MMCPROBE_ENABLED 0
 
+extern void __init sirloin_keys_init();
+extern void musb_disable_idle(int on);
+extern void __init sirloin_spi_init(void);
+//extern void __init sirloin_flash_init(void);
+extern void __init sirloin_gpio_iomux_init(void);
+extern void omap_uart_block_sleep(int num);
+
 static char device_serial[MAX_USB_SERIAL_NUM];
 
 static struct omap_opp sirloin_mpu_rate_table[] = {
@@ -328,8 +335,6 @@ static struct platform_device rndis_device = {
 static struct platform_device usbnet_device = {
 	.name	= "usbnet",
 };
-
-extern void musb_disable_idle(int on);
 
 static int cpcap_usb_connected_probe(struct platform_device *pdev)
 {
@@ -871,11 +876,6 @@ static int __init sirloin_i2c_init(void)
 
 arch_initcall(sirloin_i2c_init);
 
-extern void __init sirloin_spi_init(void);
-//extern void __init sirloin_flash_init(void);
-extern void __init sirloin_gpio_iomux_init(void);
-
-
 #if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
 
 static int sirloin_usb_port_startup(struct platform_device *dev, int port)
@@ -1138,7 +1138,6 @@ int sirloin_voltagescale_vcbypass(u32 target_opp, u32 current_opp,
 
 /* Sirloin specific PM */
 
-extern void omap_uart_block_sleep(int num);
 static struct wake_lock baseband_wakeup_wakelock;
 static irqreturn_t sirloin_bpwake_irqhandler(int irq, void *unused)
 {
@@ -1626,6 +1625,7 @@ static void __init sirloin_init(void)
 	//sirloin_sgx_init();
 	sirloin_power_off_init();
 	sirloin_gadget_init();
+	sirloin_keys_init();
 }
 
 static void __init sirloin_map_io(void)
