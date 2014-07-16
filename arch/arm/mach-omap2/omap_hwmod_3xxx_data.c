@@ -4119,7 +4119,7 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
 	&omap3xxx_gpio6_hwmod,
 
 	/* gpu class */
-	&omap3xxx_gpu_hwmod,
+	//&omap3xxx_gpu_hwmod,
 
 	/* dma_system class*/
 	&omap3xxx_dma_system_hwmod,
