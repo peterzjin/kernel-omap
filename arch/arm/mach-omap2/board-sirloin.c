@@ -37,6 +37,7 @@
 #include "sdram-qimonda-hyb18m512160af-6.h"
 #include "mux.h"
 #include "pm.h"
+#include "prm-regbits-34xx.h"
 
 /*
  * cpuidle C-states definition override from the default values.
@@ -58,6 +59,11 @@ static struct cpuidle_params sirloin_cpuidle_params[] = {
 	/* C7 */
 	{7505 + 15274, 484329, 1},
 };
+
+void debug_rst()
+{
+	writel(0x4, OMAP3430_PRM_RSTCTRL);
+}
 
 static void __init sirloin_init_early(void)
 {
