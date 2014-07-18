@@ -93,7 +93,7 @@ static void __init sirloin_init(void)
 	omap3_pm_init_cpuidle(sirloin_cpuidle_params);
 	omap_serial_init();
 	usb_musb_init(&musb_board_data);
-	//sirloin_peripherals_init();
+	sirloin_peripherals_init();
 
 	/* Ensure SDRC pins are mux'd for self-refresh */
 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
